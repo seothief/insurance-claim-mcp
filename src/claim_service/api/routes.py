@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException, Response, status
 
 from claim_service.domain.errors import (
+    AccessDeniedError,
     ConflictError,
     DomainError,
     InvalidMappingError,
@@ -27,6 +28,8 @@ router = APIRouter(prefix="/api")
 
 
 def _raise_http(exc: DomainError) -> HTTPException:
+    if isinstance(exc, AccessDeniedError):
+        return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     if isinstance(exc, NotFoundError):
         return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     if isinstance(exc, ConflictError):
@@ -83,9 +86,9 @@ def register_user(body: UserIn) -> UserProfile:
     description="사용자가 있는지, 보험이 몇 개 등록됐는지, 확인이 필요한 특약이 있는지 알려줍니다. "
     "없는 사용자면 404입니다.",
 )
-def get_user_profile(user_id: str) -> UserProfile:
+def get_user_profile(user_id: str, pin: str | None = None) -> UserProfile:
     try:
-        return get_service().user_profile(user_id)
+        return get_service().user_profile(user_id, pin=pin)
     except DomainError as exc:
         raise _raise_http(exc) from exc
 
@@ -99,9 +102,9 @@ def get_user_profile(user_id: str) -> UserProfile:
     "새로 만들지 않고 갱신합니다. 응답의 unresolved_riders가 있으면 ai_follow_up_prompt를 "
     "참고해 사용자에게 쉬운 말로 되묻고, resolveRider로 확정하세요.",
 )
-def register_policy(user_id: str, body: PolicyIn) -> PolicyRegistration:
+def register_policy(user_id: str, body: PolicyIn, pin: str | None = None) -> PolicyRegistration:
     try:
-        return get_service().register_policy(user_id, body)
+        return get_service().register_policy(user_id, body, pin=pin)
     except DomainError as exc:
         raise _raise_http(exc) from exc
 
@@ -113,8 +116,11 @@ def register_policy(user_id: str, body: PolicyIn) -> PolicyRegistration:
     summary="등록한 보험 목록",
     description="사용자가 등록한 보험과 특약 목록을 돌려줍니다. 특약 ID(rider_id)도 포함됩니다.",
 )
-def list_policies(user_id: str) -> list[PolicyOut]:
-    return get_service().list_policies(user_id)
+def list_policies(user_id: str, pin: str | None = None) -> list[PolicyOut]:
+    try:
+        return get_service().list_policies(user_id, pin=pin)
+    except DomainError as exc:
+        raise _raise_http(exc) from exc
 
 
 @router.delete(
@@ -126,8 +132,12 @@ def list_policies(user_id: str) -> list[PolicyOut]:
     description="더 이상 가입하지 않은 보험을 삭제합니다. "
     "사용자가 삭제를 분명히 원할 때만 호출하세요.",
 )
-def delete_policy(user_id: str, policy_id: str) -> Response:
-    if not get_service().delete_policy(user_id, policy_id):
+def delete_policy(user_id: str, policy_id: str, pin: str | None = None) -> Response:
+    try:
+        deleted = get_service().delete_policy(user_id, policy_id, pin=pin)
+    except DomainError as exc:
+        raise _raise_http(exc) from exc
+    if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="policy not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -139,8 +149,16 @@ def delete_policy(user_id: str, policy_id: str) -> Response:
     summary="특약 가입금액 수정",
     description="특약 하나의 가입금액만 바꿉니다. 금액은 원 단위 정수입니다.",
 )
-def update_rider(user_id: str, rider_id: str, body: RiderUpdate) -> Response:
-    if not get_service().update_rider_amount(user_id, rider_id, body.coverage_amount):
+def update_rider(
+    user_id: str, rider_id: str, body: RiderUpdate, pin: str | None = None
+) -> Response:
+    try:
+        updated = get_service().update_rider_amount(
+            user_id, rider_id, body.coverage_amount, pin=pin
+        )
+    except DomainError as exc:
+        raise _raise_http(exc) from exc
+    if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="rider not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -154,10 +172,12 @@ def update_rider(user_id: str, rider_id: str, body: RiderUpdate) -> Response:
     "CUSTOM은 custom_rule_config를 함께 보내며, IGNORED는 청구와 무관한 특약(사망 등)입니다. "
     "사용자에게 확인하지 않고 추측해서 확정하지 마세요.",
 )
-def resolve_rider(user_id: str, rider_id: str, body: RiderResolve) -> RiderOut:
+def resolve_rider(
+    user_id: str, rider_id: str, body: RiderResolve, pin: str | None = None
+) -> RiderOut:
     """Confirm a rider's mapping after the registering AI re-checks the policy."""
     try:
-        return get_service().resolve_rider(user_id, rider_id, body)
+        return get_service().resolve_rider(user_id, rider_id, body, pin=pin)
     except DomainError as exc:
         raise _raise_http(exc) from exc
 
@@ -172,6 +192,9 @@ def resolve_rider(user_id: str, rider_id: str, body: RiderResolve) -> RiderOut:
     "결과는 정보 제공용 예상치이며 지급을 확정하는 표현으로 안내하면 안 됩니다. "
     "pending_riders가 있으면 확인되지 않은 특약이 있다는 뜻입니다.",
 )
-def evaluate(user_id: str, body: ClaimInput) -> ClaimEvaluation:
+def evaluate(user_id: str, body: ClaimInput, pin: str | None = None) -> ClaimEvaluation:
     """Evaluate a claim. The request is not stored; only informational estimates are returned."""
-    return get_service().evaluate(user_id, body)
+    try:
+        return get_service().evaluate(user_id, body, pin=pin)
+    except DomainError as exc:
+        raise _raise_http(exc) from exc

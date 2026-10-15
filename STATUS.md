@@ -180,6 +180,18 @@
 ### 남은 항목
 - v2 배포, Custom GPT 연결 시험, 사용자별 인증, 개인정보 처리방침.
 
+## Phase 1-F. 무상태 MCP(`stateless_http=True`) 전환 및 하이브리드 사용자 특정(PIN + 헤더 귀속) — 배포 및 원격 MCP 호출 검증 완료
+
+### 확인된 사실 (실제 실행 결과)
+- Cloud Run 환경에서 기본 stateful MCP 세션이 컨테이너 재시작/스케일링 시 `Session not found`(-32600) 오류를 내는 문제를 확인하고 `mcp.http_app(path="/", stateless_http=True)`로 전환함.
+- 하이브리드 사용자 특정 구현:
+  1. `users.pin_hash`(PBKDF2-HMAC-SHA256, 120,000회 반복) 컬럼 추가 및 기존 DB 자동 마이그레이션(`ALTER TABLE users ADD COLUMN pin_hash`).
+  2. PIN이 설정된 계정은 올바른 `pin` 파라미터 또는 `X-User-Pin` 헤더가 없으면 `AccessDeniedError`(HTTP 403 / MCP ValueError)로 타인 접근 및 별명 충돌을 차단함.
+  3. 전용 AI 클라이언트가 `X-User-Id` 헤더로 귀속된 경우 다른 `user_id` 접근을 차단하고 `get_onboarding_guide`에 `bound_user_id`를 반환함.
+- 로컬 검증: `pytest -q` **43 passed**, `ruff check src tests` 통과, `mypy src` 통과 (26개 파일).
+- Cloud Run `app:v4` 이미지 빌드 및 리비전 `insurance-claim-mcp-00004-2vr` 배포 완료.
+- 실제 Cline MCP 도구 호출(`insurance-claim__get_onboarding_guide`)이 Cloud Run 원격 서버에서 오류 없이 즉시 성공함을 확인함.
+
 ## 사용자 확보 대기 항목
 - 4세대 실손 표준약관 또는 가입 상품 약관 (약관 수치 `verified` 확정용).
 - GCP 프로젝트 결정 (Phase 6 전).

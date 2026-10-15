@@ -36,6 +36,7 @@ users = Table(
     Column("user_id", String(64), primary_key=True),
     Column("display_alias", String(100), nullable=True),
     Column("birth_year", Integer, nullable=True),
+    Column("pin_hash", String(128), nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 

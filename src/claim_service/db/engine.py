@@ -1,6 +1,6 @@
 """Engine creation and schema initialisation."""
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, inspect, text
 
 from claim_service.db.tables import metadata
 
@@ -39,3 +39,8 @@ def create_db_engine(database_url: str) -> Engine:
 
 def init_schema(engine: Engine) -> None:
     metadata.create_all(engine)
+    # Lightweight additive migration for existing databases created before pin_hash existed.
+    with engine.begin() as conn:
+        columns = {col["name"] for col in inspect(conn).get_columns("users")}
+        if "pin_hash" not in columns:
+            conn.execute(text("ALTER TABLE users ADD COLUMN pin_hash VARCHAR(128)"))

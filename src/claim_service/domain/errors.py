@@ -19,3 +19,8 @@ class DuplicateRiderError(ConflictError):
 
 class InvalidMappingError(DomainError):
     """A rider mapping does not satisfy the standard rule or custom condition requirements."""
+
+
+class AccessDeniedError(DomainError):
+    """The user_id belongs to another user or the PIN / bound API key does not match."""
+

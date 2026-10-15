@@ -22,7 +22,7 @@ from claim_service.runtime import init_runtime
 APP_VERSION = os.environ.get("APP_VERSION", "local")
 MCP_PATH = "/mcp"
 
-mcp_app = mcp.http_app(path="/")
+mcp_app = mcp.http_app(path="/", stateless_http=True)
 
 
 def _db_lifespan(database_url: str | None) -> Callable[[FastAPI], Any]:

@@ -8,6 +8,8 @@ import hmac
 from collections.abc import Awaitable, Callable, MutableMapping
 from typing import Any
 
+from claim_service.domain.security import set_request_identity
+
 # /openapi.json describes the API shape only (no user data). ChatGPT Actions must fetch it
 # without credentials when a GPT is configured.
 PUBLIC_PATHS = frozenset({"/api/health", "/api/version", "/openapi.json"})
@@ -18,16 +20,23 @@ Send = Callable[[Message], Awaitable[None]]
 ASGIApp = Callable[[Scope, Receive, Send], Awaitable[None]]
 
 
-def _extract_key(headers: list[tuple[bytes, bytes]]) -> str:
+def _extract_headers(headers: list[tuple[bytes, bytes]]) -> tuple[str, str | None, str | None]:
+    api_key = ""
+    bound_user: str | None = None
+    header_pin: str | None = None
     for name, value in headers:
         lowered = name.lower()
         if lowered == b"x-api-key":
-            return value.decode("latin-1")
-        if lowered == b"authorization":
+            api_key = value.decode("latin-1")
+        elif lowered == b"authorization":
             text = value.decode("latin-1")
             if text.lower().startswith("bearer "):
-                return text[7:].strip()
-    return ""
+                api_key = text[7:].strip()
+        elif lowered == b"x-user-id":
+            bound_user = value.decode("latin-1").strip() or None
+        elif lowered == b"x-user-pin":
+            header_pin = value.decode("latin-1").strip() or None
+    return api_key, bound_user, header_pin
 
 
 class ApiKeyMiddleware:
@@ -48,10 +57,11 @@ class ApiKeyMiddleware:
         if scope.get("path") in PUBLIC_PATHS:
             await self._app(scope, receive, send)
             return
+        provided, bound_user, header_pin = _extract_headers(scope.get("headers", []))
+        set_request_identity(bound_user, header_pin)
         if not self._api_key:
             await self._app(scope, receive, send)
             return
-        provided = _extract_key(scope.get("headers", []))
         if not hmac.compare_digest(provided.encode(), self._api_key.encode()):
             body = b'{"detail":"invalid or missing API key"}'
             await send({
@@ -62,4 +72,7 @@ class ApiKeyMiddleware:
             })
             await send({"type": "http.response.body", "body": body})
             return
-        await self._app(scope, receive, send)
+        try:
+            await self._app(scope, receive, send)
+        finally:
+            set_request_identity(None, None)

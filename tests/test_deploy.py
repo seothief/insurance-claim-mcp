@@ -89,3 +89,31 @@ def test_api_accepts_x_api_key_and_bearer(keyed_client: TestClient) -> None:
         "/api/catalog/rules", headers={"Authorization": "Bearer secret-test-key"}
     )
     assert by_bearer.status_code == 200
+
+
+def test_pin_protected_user_blocks_wrong_pin_and_allows_correct_pin(
+    keyed_client: TestClient,
+) -> None:
+    headers = {"X-API-Key": "secret-test-key"}
+    created = keyed_client.post(
+        "/api/users",
+        headers=headers,
+        json={"user_id": "seoth", "display_alias": "본인", "pin": "4829"},
+    )
+    assert created.status_code == 201
+    assert created.json()["pin_protected"] is True
+
+    # Missing or wrong PIN is rejected with 403
+    assert keyed_client.get("/api/users/seoth", headers=headers).status_code == 403
+    assert keyed_client.get("/api/users/seoth?pin=0000", headers=headers).status_code == 403
+
+    # Correct PIN via query or X-User-Pin header succeeds
+    assert keyed_client.get("/api/users/seoth?pin=4829", headers=headers).status_code == 200
+    header_pin = {**headers, "X-User-Pin": "4829"}
+    assert keyed_client.get("/api/users/seoth", headers=header_pin).status_code == 200
+
+
+def test_bound_user_header_prevents_cross_user_access(keyed_client: TestClient) -> None:
+    bound_headers = {"X-API-Key": "secret-test-key", "X-User-Id": "seoth"}
+    assert keyed_client.get("/api/users/user_123", headers=bound_headers).status_code == 403
+

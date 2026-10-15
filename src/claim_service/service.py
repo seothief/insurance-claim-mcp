@@ -5,7 +5,12 @@ from typing import Any
 
 from claim_service.db.repository import PolicyRepository, RiderPlan
 from claim_service.domain.catalog import candidate_rule_ids, match_fixed_rule
-from claim_service.domain.errors import ConflictError, InvalidMappingError, NotFoundError
+from claim_service.domain.errors import (
+    AccessDeniedError,
+    ConflictError,
+    InvalidMappingError,
+    NotFoundError,
+)
 from claim_service.domain.evaluator import evaluate_claim
 from claim_service.domain.models import (
     ClaimEvaluation,
@@ -27,6 +32,12 @@ from claim_service.domain.onboarding import (
     build_onboarding_guide,
     next_step_message,
 )
+from claim_service.domain.security import (
+    get_bound_user,
+    get_header_pin,
+    hash_pin,
+    verify_pin,
+)
 from claim_service.domain.silson import resolve_silson_generation
 
 
@@ -42,14 +53,18 @@ class PolicyService:
 
     # ---- onboarding -----------------------------------------------------
     def register_user(self, user: UserIn) -> UserProfile:
-        if not self._repo.create_user(user):
-            raise ConflictError(f"이미 등록된 사용자입니다: {user.user_id}")
-        return self.user_profile(user.user_id)
+        self._check_bound_user(user.user_id)
+        effective_pin = user.pin or get_header_pin()
+        pin_hashed = hash_pin(effective_pin) if effective_pin else None
+        if not self._repo.create_user(user, pin_hash=pin_hashed):
+            raise ConflictError(
+                f"이미 등록된 사용자입니다 ({user.user_id}). "
+                "본인이 맞다면 PIN과 함께 조회하고, 처음이시면 다른 별명을 사용해 주세요."
+            )
+        return self.user_profile(user.user_id, pin=effective_pin)
 
-    def user_profile(self, user_id: str) -> UserProfile:
-        record = self._repo.get_user(user_id)
-        if record is None:
-            raise NotFoundError(f"사용자를 찾을 수 없습니다: {user_id}")
+    def user_profile(self, user_id: str, pin: str | None = None) -> UserProfile:
+        record = self._require_authorized_user(user_id, pin)
         policies = self._repo.list_policies(user_id)
         rules = self._repo.get_rules()
         riders = [rider for policy in policies for rider in policy.riders]
@@ -68,6 +83,7 @@ class PolicyService:
             user_id=user_id,
             display_alias=record["display_alias"],
             birth_year=record["birth_year"],
+            pin_protected=bool(record.get("pin_hash")),
             onboarding_status=status,
             policy_count=len(policies),
             rider_count=len(riders),
@@ -77,9 +93,11 @@ class PolicyService:
         )
 
     # ---- policies -------------------------------------------------------
-    def register_policy(self, user_id: str, policy: PolicyIn) -> PolicyRegistration:
+    def register_policy(
+        self, user_id: str, policy: PolicyIn, pin: str | None = None
+    ) -> PolicyRegistration:
         """Register or update a policy. Riders that cannot be mapped come back for AI follow-up."""
-        self._repo.ensure_user(user_id)
+        self._ensure_authorized_user(user_id, pin)
         rules = self._repo.get_rules()
         generation, note = resolve_silson_generation(policy.silson_generation, policy.enrolled_year)
         draft = PolicyOut(
@@ -105,17 +123,25 @@ class PolicyService:
             ai_follow_up_prompt=prompt,
         )
 
-    def list_policies(self, user_id: str) -> list[PolicyOut]:
+    def list_policies(self, user_id: str, pin: str | None = None) -> list[PolicyOut]:
+        self._verify_existing_if_present(user_id, pin)
         return self._repo.list_policies(user_id)
 
-    def delete_policy(self, user_id: str, policy_id: str) -> bool:
+    def delete_policy(self, user_id: str, policy_id: str, pin: str | None = None) -> bool:
+        self._verify_existing_if_present(user_id, pin)
         return self._repo.delete_policy(user_id, policy_id)
 
-    def update_rider_amount(self, user_id: str, rider_id: str, amount: int) -> bool:
+    def update_rider_amount(
+        self, user_id: str, rider_id: str, amount: int, pin: str | None = None
+    ) -> bool:
+        self._verify_existing_if_present(user_id, pin)
         return self._repo.update_rider(user_id, rider_id, {"coverage_amount": amount})
 
-    def resolve_rider(self, user_id: str, rider_id: str, body: RiderResolve) -> RiderOut:
+    def resolve_rider(
+        self, user_id: str, rider_id: str, body: RiderResolve, pin: str | None = None
+    ) -> RiderOut:
         """Confirm a rider's mapping. Called after the registering AI re-checks the policy."""
+        self._verify_existing_if_present(user_id, pin)
         if self._repo.get_rider(user_id, rider_id) is None:
             raise NotFoundError("특약을 찾을 수 없습니다.")
         values = self._resolve_values(body, self._repo.get_rules())
@@ -177,7 +203,54 @@ class PolicyService:
             values["coverage_amount"] = body.coverage_amount
         return values
 
-    def evaluate(self, user_id: str, claim: ClaimInput) -> ClaimEvaluation:
+    def evaluate(
+        self, user_id: str, claim: ClaimInput, pin: str | None = None
+    ) -> ClaimEvaluation:
         """Evaluate a claim against the user's stored policies. The claim is never persisted."""
+        self._verify_existing_if_present(user_id, pin)
         policies = self._repo.list_policies(user_id)
         return evaluate_claim(user_id, policies, self._repo.get_rules(), claim)
+
+    # ---- access control helpers -----------------------------------------
+    @staticmethod
+    def _check_bound_user(user_id: str) -> None:
+        bound = get_bound_user()
+        if bound and bound != user_id:
+            raise AccessDeniedError(
+                f"현재 연결은 '{bound}' 전용으로 귀속되어 '{user_id}'에 접근할 수 없습니다."
+            )
+
+    def _require_authorized_user(self, user_id: str, pin: str | None) -> dict[str, Any]:
+        self._check_bound_user(user_id)
+        record = self._repo.get_user(user_id)
+        if record is None:
+            raise NotFoundError(f"사용자를 찾을 수 없습니다: {user_id}")
+        self._check_pin(record, pin)
+        return record
+
+    def _verify_existing_if_present(self, user_id: str, pin: str | None) -> None:
+        self._check_bound_user(user_id)
+        record = self._repo.get_user(user_id)
+        if record is not None:
+            self._check_pin(record, pin)
+
+    def _ensure_authorized_user(self, user_id: str, pin: str | None) -> None:
+        self._check_bound_user(user_id)
+        effective_pin = pin or get_header_pin()
+        record = self._repo.get_user(user_id)
+        if record is None:
+            pin_hashed = hash_pin(effective_pin) if effective_pin else None
+            self._repo.ensure_user(user_id, pin_hash=pin_hashed)
+            return
+        self._check_pin(record, effective_pin)
+
+    @staticmethod
+    def _check_pin(record: dict[str, Any], pin: str | None) -> None:
+        stored_hash = record.get("pin_hash")
+        if not stored_hash:
+            return
+        candidate = pin or get_header_pin()
+        if not candidate or not verify_pin(candidate, str(stored_hash)):
+            raise AccessDeniedError(
+                "이미 다른 사용자가 사용 중인 별명이거나 PIN 번호가 일치하지 않습니다."
+            )

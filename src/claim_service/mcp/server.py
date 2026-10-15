@@ -14,20 +14,25 @@ from claim_service.domain.models import (
     RiderResolve,
     UserIn,
 )
+from claim_service.domain.security import get_bound_user
 from claim_service.runtime import get_service
 
 ASSISTANT_INSTRUCTIONS = (
     "너는 사용자의 보험 등록과 병원 영수증 기준 예상 보험금 계산을 돕는 도우미다. "
     "사용자는 별도 UI 없이 너와만 대화한다. 모든 응답은 한국어로, 쉬운 말로 작성한다.\n"
-    "[호출 순서]\n"
-    "1. 사용자의 별명(user_id: 영문/숫자/_/-)을 확인하고 get_user_profile을 먼저 호출한다. "
-    "없으면 register_user로 생성한다.\n"
-    "2. 보험증권이나 보험앱 캡처 이미지를 받으면 보험사, 상품명, 가입연도, 실손세대, 특약명, "
+    "[서비스 시작 및 사용자 특정 규칙]\n"
+    "1. 사용자가 '보험비서 시작'(또는 '보험 시작')이라고 말하면 즉시 "
+    "get_onboarding_guide를 호출한다.\n"
+    "2. 응답에 bound_user_id가 있으면 사용자에게 별명을 묻지 않고 바로 그 ID로 "
+    "get_user_profile을 호출한다. bound_user_id가 없으면 사용할 별명(user_id)과 "
+    "본인 확인용 PIN(4자리 이상)을 물어본 뒤 get_user_profile 또는 "
+    "register_user를 호출한다.\n"
+    "3. 보험증권이나 보험앱 캡처 이미지를 받으면 보험사, 상품명, 가입연도, 실손세대, 특약명, "
     "가입금액(원 단위 정수)을 추출해 사용자에게 요약해 보여주고, 맞는지 확인받은 뒤 "
     "register_user_policy를 호출한다. 불확실한 숫자는 추측하지 말고 되묻는다.\n"
-    "3. register_user_policy 결과에 unresolved_riders가 있으면 ai_follow_up_prompt를 참고해 "
+    "4. register_user_policy 결과에 unresolved_riders가 있으면 ai_follow_up_prompt를 참고해 "
     "증권을 다시 확인하거나 사용자에게 쉬운 말로 질문한 뒤 resolve_user_rider로 확정한다.\n"
-    "4. 병원 영수증·처방전·약봉투 사진을 받으면 급여/비급여 금액, 병원 종별, 질병코드(KCD), "
+    "5. 병원 영수증·처방전·약봉투 사진을 받으면 급여/비급여 금액, 병원 종별, 질병코드(KCD), "
     "처치명, 처방약을 읽어 evaluate_claim을 호출한다.\n"
     "[주의사항]\n"
     "- 모든 약관 수치는 verified=false 상태이므로 '예상 금액'으로만 안내하고, "
@@ -54,25 +59,29 @@ def _guard[T](call: Callable[[], T]) -> T:
 
 @mcp.tool()
 def get_onboarding_guide() -> dict[str, object]:
-    """Explain how to register a user and their policies, and which standard rules exist."""
-    return get_service().onboarding_guide()
+    """서비스 시작 시 가장 먼저 호출합니다. 온보딩 절차와 bound_user_id를 반환합니다."""
+    guide = dict(get_service().onboarding_guide())
+    guide["trigger_phrase"] = "보험비서 시작"
+    guide["bound_user_id"] = get_bound_user()
+    return guide
 
 
 @mcp.tool()
 def register_user(
     user_id: str,
+    pin: str | None = None,
     display_alias: str | None = None,
     birth_year: int | None = None,
 ) -> dict[str, object]:
-    """Create a new user (step 1 of onboarding). user_id may only use letters, digits, _ and -."""
-    user = UserIn(user_id=user_id, display_alias=display_alias, birth_year=birth_year)
+    """신규 사용자를 등록합니다. 타인과 겹치지 않도록 4자리 이상의 PIN을 함께 설정합니다."""
+    user = UserIn(user_id=user_id, display_alias=display_alias, birth_year=birth_year, pin=pin)
     return _guard(lambda: get_service().register_user(user).model_dump())
 
 
 @mcp.tool()
-def get_user_profile(user_id: str) -> dict[str, object]:
-    """Show onboarding status, policy count and riders that still need confirmation."""
-    return _guard(lambda: get_service().user_profile(user_id).model_dump())
+def get_user_profile(user_id: str, pin: str | None = None) -> dict[str, object]:
+    """사용자의 온보딩 상태, 등록 보험 수, 미매핑 특약을 조회합니다."""
+    return _guard(lambda: get_service().user_profile(user_id, pin=pin).model_dump())
 
 
 @mcp.tool()
@@ -82,9 +91,11 @@ def list_standard_rules() -> list[dict[str, object]]:
 
 
 @mcp.tool()
-def list_user_policies(user_id: str) -> list[dict[str, object]]:
-    """List the user's active policies and their riders (with rider_id for updates)."""
-    return [p.model_dump() for p in get_service().list_policies(user_id)]
+def list_user_policies(user_id: str, pin: str | None = None) -> list[dict[str, object]]:
+    """사용자의 활성 보험 계약 및 특약 목록을 조회합니다."""
+    return _guard(
+        lambda: [p.model_dump() for p in get_service().list_policies(user_id, pin=pin)]
+    )
 
 
 @mcp.tool()
@@ -97,9 +108,9 @@ def register_user_policy(
     silson_generation: int | None = None,
     enrolled_year: int | None = None,
     replace_riders: bool = False,
+    pin: str | None = None,
 ) -> dict[str, object]:
-    """Register or update a policy. Riders that could not be mapped are returned with an
-    ai_follow_up_prompt; re-check the policy and call resolve_user_rider for each one."""
+    """보험을 등록하거나 갱신합니다. 미매핑 특약은 resolve_user_rider로 확정하세요."""
     policy = PolicyIn(
         company=company,
         product_name=product_name,
@@ -109,7 +120,7 @@ def register_user_policy(
         riders=riders,
         replace_riders=replace_riders,
     )
-    return _guard(lambda: get_service().register_policy(user_id, policy).model_dump())
+    return _guard(lambda: get_service().register_policy(user_id, policy, pin=pin).model_dump())
 
 
 @mcp.tool()
@@ -120,31 +131,45 @@ def resolve_user_rider(
     mapped_rule_id: str | None = None,
     custom_rule_config: dict[str, object] | None = None,
     coverage_amount: int | None = None,
+    pin: str | None = None,
 ) -> dict[str, object]:
-    """Confirm a rider's mapping. mapping_status: MAPPED (with mapped_rule_id), CUSTOM (with
-    custom_rule_config such as target_kcd_prefixes or target_keywords), or IGNORED."""
+    """미매핑 특약의 매핑을 확정합니다 (MAPPED, CUSTOM, IGNORED)."""
     body = RiderResolve(
         mapping_status=mapping_status,
         mapped_rule_id=mapped_rule_id,
         custom_rule_config=custom_rule_config,
         coverage_amount=coverage_amount,
     )
-    return _guard(lambda: get_service().resolve_rider(user_id, rider_id, body).model_dump())
+    return _guard(
+        lambda: get_service().resolve_rider(user_id, rider_id, body, pin=pin).model_dump()
+    )
 
 
 @mcp.tool()
-def delete_user_policy(user_id: str, policy_id: str) -> dict[str, bool]:
-    """Delete a policy the user no longer holds (for example, a cancelled policy)."""
-    return {"deleted": get_service().delete_policy(user_id, policy_id)}
+def delete_user_policy(
+    user_id: str, policy_id: str, pin: str | None = None
+) -> dict[str, bool]:
+    """해지한 보험 계약을 삭제합니다."""
+    return _guard(lambda: {"deleted": get_service().delete_policy(user_id, policy_id, pin=pin)})
 
 
 @mcp.tool()
-def update_user_rider(user_id: str, rider_id: str, coverage_amount: int) -> dict[str, bool]:
-    """Change the coverage amount of one rider."""
-    return {"updated": get_service().update_rider_amount(user_id, rider_id, coverage_amount)}
+def update_user_rider(
+    user_id: str, rider_id: str, coverage_amount: int, pin: str | None = None
+) -> dict[str, bool]:
+    """특약 1건의 가입금액을 변경합니다."""
+    return _guard(
+        lambda: {
+            "updated": get_service().update_rider_amount(
+                user_id, rider_id, coverage_amount, pin=pin
+            )
+        }
+    )
 
 
 @mcp.tool()
-def evaluate_claim(user_id: str, claim: ClaimInput) -> dict[str, object]:
-    """Estimate payouts for a receipt or prescription. The claim data is not stored."""
-    return get_service().evaluate(user_id, claim).model_dump()
+def evaluate_claim(
+    user_id: str, claim: ClaimInput, pin: str | None = None
+) -> dict[str, object]:
+    """영수증/처방전 정보로 예상 보험금을 계산합니다. 입력된 진료 정보는 저장되지 않습니다."""
+    return _guard(lambda: get_service().evaluate(user_id, claim, pin=pin).model_dump())

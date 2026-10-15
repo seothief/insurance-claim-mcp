@@ -80,7 +80,7 @@ class PolicyRepository:
         }
 
     # ---- users ----------------------------------------------------------
-    def create_user(self, user: UserIn) -> bool:
+    def create_user(self, user: UserIn, pin_hash: str | None = None) -> bool:
         """Insert a user. Returns False when the user already exists."""
         with self._engine.begin() as conn:
             exists = conn.execute(
@@ -93,17 +93,25 @@ class PolicyRepository:
                     user_id=user.user_id,
                     display_alias=user.display_alias,
                     birth_year=user.birth_year,
+                    pin_hash=pin_hash,
                 )
             )
             return True
-    def ensure_user(self, user_id: str) -> None:
+
+    def set_user_pin_hash(self, user_id: str, pin_hash: str) -> None:
+        with self._engine.begin() as conn:
+            conn.execute(
+                update(users).where(users.c.user_id == user_id).values(pin_hash=pin_hash)
+            )
+
+    def ensure_user(self, user_id: str, pin_hash: str | None = None) -> None:
         """Create a bare user record if needed (used when a policy is registered first)."""
         with self._engine.begin() as conn:
             exists = conn.execute(
                 select(users.c.user_id).where(users.c.user_id == user_id)
             ).first()
             if exists is None:
-                conn.execute(insert(users).values(user_id=user_id))
+                conn.execute(insert(users).values(user_id=user_id, pin_hash=pin_hash))
 
     def get_user(self, user_id: str) -> dict[str, Any] | None:
         with self._engine.connect() as conn:

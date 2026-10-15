@@ -32,6 +32,7 @@ class UserIn(BaseModel):
     user_id: str = Field(min_length=1, max_length=64, pattern=USER_ID_PATTERN)
     display_alias: str | None = Field(default=None, max_length=100)
     birth_year: int | None = Field(default=None, ge=1900, le=2100)
+    pin: str | None = Field(default=None, min_length=4, max_length=32)
 
 
 class UnresolvedRider(BaseModel):
@@ -46,6 +47,7 @@ class UserProfile(BaseModel):
     user_id: str
     display_alias: str | None = None
     birth_year: int | None = None
+    pin_protected: bool = False
     onboarding_status: OnboardingStatus
     policy_count: int
     rider_count: int
