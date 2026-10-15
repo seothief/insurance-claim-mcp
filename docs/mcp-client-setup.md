@@ -67,22 +67,22 @@ MCP 설정 JSON(예: Cline의 `cline_mcp_settings.json`)에 아래 항목을 추
 
 ## 3. Antigravity 연결 (`mcp_config.json`)
 
-Antigravity의 MCP 설정 파일(`C:\Users\<사용자>\.gemini\config\mcp_config.json`)에 로컬 stdio 모드로 등록하면 API 키 없이 로컬 DB(`claim_service.db`)로 즉시 동작합니다:
+Antigravity의 MCP 설정 파일(`C:\Users\<사용자>\.gemini\config\mcp_config.json`)에 Cloud Run 원격 서버를 등록합니다:
 
 ```json
 {
   "mcpServers": {
     "insurance-claim": {
-      "command": "C:\\Users\\<사용자>\\.gemini\\antigravity\\scratch\\insurance-claim-mcp\\.venv\\Scripts\\python.exe",
-      "args": [
-        "-m",
-        "claim_service.mcp.server"
-      ]
+      "serverUrl": "https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/mcp",
+      "headers": {
+        "X-API-Key": "<API_KEY>"
+      }
     }
   }
 }
 ```
-- 클라우드(Neon PostgreSQL) DB를 함께 쓰고 싶다면 `"env": { "DATABASE_URL": "postgresql+psycopg://..." }`를 추가하면 됩니다.
+- 본인 전용으로 고정하려면 `"headers"`에 `"X-User-Id": "<내 별명>"`, `"X-User-Pin": "<내 PIN>"`을 함께 넣을 수 있습니다.
+
 
 ---
 
