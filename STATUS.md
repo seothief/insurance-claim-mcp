@@ -146,6 +146,32 @@
 - 서버를 https 주소로 배포한 뒤 Custom GPT를 만들어 실제로 등록과 계산이 되는지 시험.
 - 사용자별 인증 설계, 개인정보 처리방침.
 
+## Phase 1-E. Cloud Run 배포 — 배포 완료, 외부 연결 시험 대기
+
+### 확인된 사실 (실제 실행 결과)
+- 서비스 URL: `https://insurance-claim-mcp-878600435547.asia-northeast3.run.app` (리전 `asia-northeast3`, 리비전 `insurance-claim-mcp-00001-p6k`).
+- 설정: 최소 인스턴스 0, 최대 2, 메모리 512Mi, 공개 접근 허용 + API 키 보호.
+- GCP 프로젝트 `project-93d02748-0cbc-4596-902`. Artifact Registry 저장소 `insurance-claim` 생성, 이미지 `app:v1` 빌드 성공(Cloud Build 1분 18초).
+- 운영 DB: Neon PostgreSQL 18.6 (Singapore, `neondb`), 연결 확인 시 public 테이블 0개였음.
+- 공개 주소 시험 결과(v1): `/api/health` 200, 키 없이 `/api/catalog/rules` 401, 틀린 키 401, 올바른 키 200(5459 bytes),
+  키 없이 `/openapi.json` 401.
+- 로컬 `pytest -q` 40 passed, `ruff` 통과, `mypy src` 통과 (25개 파일).
+
+### 발견한 문제와 조치
+- `/openapi.json`이 키 없이는 401이라 ChatGPT가 스키마를 가져오지 못한다. 스키마에는 사용자 데이터가 없으므로 공개 경로로 바꿨다.
+- ChatGPT Actions는 스키마에 `servers`가 필요하다. 환경변수 `PUBLIC_BASE_URL`을 넣으면 `servers`에 표시되도록 했다.
+- 위 두 가지를 반영한 이미지 `app:v2`를 빌드했고, 아직 Cloud Run에 올리지 않았다 (이 항목은 배포 후 갱신).
+- 기본 컴퓨트 서비스 계정에 Cloud Build 권한이 없어 첫 빌드가 실패했다. 4개 역할을 부여해 해결했다.
+
+### 설계 제안 (미검증)
+- 샘플 사용자 `user_123`이 운영 DB에도 시드된다. 실사용 전에 끄거나 삭제할지 정해야 한다.
+- 무료 Neon은 유휴 시 DB가 잠들어 첫 요청이 느릴 수 있다. 측정하지 않았다.
+- Cloud Run 최소 인스턴스 0이라 첫 요청에 콜드 스타트가 있다. 측정하지 않았다.
+- GitHub Actions의 `deploy-cloudrun.yml`은 Workload Identity 방식이고 아직 설정하지 않았다. 지금은 `gcloud`로 수동 배포했다.
+
+### 남은 항목
+- v2 배포, Custom GPT 연결 시험, 사용자별 인증, 개인정보 처리방침.
+
 ## 사용자 확보 대기 항목
 - 4세대 실손 표준약관 또는 가입 상품 약관 (약관 수치 `verified` 확정용).
 - GCP 프로젝트 결정 (Phase 6 전).

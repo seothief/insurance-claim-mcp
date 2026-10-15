@@ -8,7 +8,9 @@ import hmac
 from collections.abc import Awaitable, Callable, MutableMapping
 from typing import Any
 
-PUBLIC_PATHS = frozenset({"/api/health", "/api/version"})
+# /openapi.json describes the API shape only (no user data). ChatGPT Actions must fetch it
+# without credentials when a GPT is configured.
+PUBLIC_PATHS = frozenset({"/api/health", "/api/version", "/openapi.json"})
 Scope = MutableMapping[str, Any]
 Message = MutableMapping[str, Any]
 Receive = Callable[[], Awaitable[Message]]

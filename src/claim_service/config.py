@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # When set, every /api and /mcp request must send it as X-API-Key or Bearer token.
     # Leave empty for local development.
     api_key: str = ""
+    # Public https base URL of this service. Listed in openapi.json "servers" because
+    # ChatGPT Actions requires it. Leave empty for local development.
+    public_base_url: str = ""
 
 
 @lru_cache(maxsize=1)

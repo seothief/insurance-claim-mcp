@@ -35,6 +35,24 @@ def test_health_stays_public_when_key_is_set(keyed_client: TestClient) -> None:
     assert keyed_client.get("/api/health").status_code == 200
 
 
+def test_openapi_schema_is_public_but_data_is_not(keyed_client: TestClient) -> None:
+    schema = keyed_client.get("/openapi.json")
+    assert schema.status_code == 200
+    assert schema.json()["openapi"].startswith("3.1")
+    assert keyed_client.get("/api/users/user_123/policies").status_code == 401
+
+
+def test_openapi_lists_servers_when_public_url_is_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fresh_external_schema: None
+) -> None:
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://example.test/")
+    get_settings.cache_clear()
+    with TestClient(create_app(database_url_for(tmp_path, "srv.db"))) as client:
+        assert client.get("/openapi.json").json()["servers"] == [{"url": "https://example.test"}]
+    monkeypatch.delenv("PUBLIC_BASE_URL")
+    get_settings.cache_clear()
+
+
 def test_api_rejects_missing_or_wrong_key(keyed_client: TestClient) -> None:
     assert keyed_client.get("/api/catalog/rules").status_code == 401
     wrong = keyed_client.get("/api/catalog/rules", headers={"X-API-Key": "nope"})

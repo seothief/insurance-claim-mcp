@@ -35,10 +35,12 @@ def _db_lifespan(database_url: str | None) -> Callable[[FastAPI], Any]:
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
+    base_url = get_settings().public_base_url.strip().rstrip("/")
     app = FastAPI(
         title="Insurance Claim MCP Service",
         version=APP_VERSION,
         lifespan=combine_lifespans(_db_lifespan(database_url), mcp_app.lifespan),
+        servers=[{"url": base_url}] if base_url else None,
     )
 
     @app.get("/api/health", include_in_schema=False)
