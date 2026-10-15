@@ -150,3 +150,14 @@ def test_mcp_lists_onboarding_and_policy_tools(client: TestClient) -> None:
         "evaluate_claim",
     }
     assert expected <= names
+
+
+def test_mcp_tool_call_works_over_in_memory_client(client: TestClient) -> None:
+    async def run() -> dict[str, object]:
+        async with Client(mcp) as mcp_client:
+            result = await mcp_client.call_tool("get_onboarding_guide", {})
+            return dict(result.data)  # type: ignore[arg-type]
+
+    guide = asyncio.run(run())
+    assert guide["trigger_phrase"] == "보험비서 시작"
+

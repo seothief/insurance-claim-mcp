@@ -26,5 +26,6 @@ def init_runtime(database_url: str | None = None, seed: bool | None = None) -> P
 
 def get_service() -> PolicyService:
     if _service is None:
-        raise RuntimeError("service is not initialised; call init_runtime() first")
+        return init_runtime()
     return _service
+

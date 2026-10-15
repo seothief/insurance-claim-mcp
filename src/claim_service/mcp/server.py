@@ -15,7 +15,7 @@ from claim_service.domain.models import (
     UserIn,
 )
 from claim_service.domain.security import get_bound_user
-from claim_service.runtime import get_service
+from claim_service.runtime import get_service, init_runtime
 
 ASSISTANT_INSTRUCTIONS = (
     "너는 사용자의 보험 등록과 병원 영수증 기준 예상 보험금 계산을 돕는 도우미다. "
@@ -173,3 +173,14 @@ def evaluate_claim(
 ) -> dict[str, object]:
     """영수증/처방전 정보로 예상 보험금을 계산합니다. 입력된 진료 정보는 저장되지 않습니다."""
     return _guard(lambda: get_service().evaluate(user_id, claim, pin=pin).model_dump())
+
+
+def main() -> None:
+    """Run the MCP server over stdio for local AI clients (Antigravity, Claude Desktop, etc.)."""
+    init_runtime()
+    mcp.run()
+
+
+if __name__ == "__main__":
+    main()
+

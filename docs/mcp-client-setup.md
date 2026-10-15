@@ -65,12 +65,33 @@ MCP 설정 JSON(예: Cline의 `cline_mcp_settings.json`)에 아래 항목을 추
 
 ---
 
-## 3. ChatGPT (Custom GPT Actions) 연결
+## 3. Antigravity 연결 (`mcp_config.json`)
+
+Antigravity의 MCP 설정 파일(`C:\Users\<사용자>\.gemini\config\mcp_config.json`)에 로컬 stdio 모드로 등록하면 API 키 없이 로컬 DB(`claim_service.db`)로 즉시 동작합니다:
+
+```json
+{
+  "mcpServers": {
+    "insurance-claim": {
+      "command": "C:\\Users\\<사용자>\\.gemini\\antigravity\\scratch\\insurance-claim-mcp\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m",
+        "claim_service.mcp.server"
+      ]
+    }
+  }
+}
+```
+- 클라우드(Neon PostgreSQL) DB를 함께 쓰고 싶다면 `"env": { "DATABASE_URL": "postgresql+psycopg://..." }`를 추가하면 됩니다.
+
+---
+
+## 4. ChatGPT (Custom GPT Actions) 연결
 - `docs/chatgpt-custom-gpt-guide.md` 문서를 참고해 `https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/openapi.json`을 불러오고 `X-API-Key` 헤더를 설정합니다.
 
 ---
 
-## 4. AI가 따르는 표준 대화 흐름 (서버 내장 지침)
+## 5. AI가 따르는 표준 대화 흐름 (서버 내장 지침)
 서버의 MCP `instructions` 및 `insurance_assistant_prompt`에 아래 순서가 내장되어 있습니다:
 1. **별명 확인 (`get_user_profile` → 없으면 `register_user`)**
 2. **보험 등록 (`register_user_policy`)**: 이미지에서 읽은 보험사·상품명·특약·금액을 사용자에게 먼저 보여주고 확인받은 뒤 호출 (휴먼 에러 및 OCR 오류 방지)

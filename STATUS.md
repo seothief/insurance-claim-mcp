@@ -191,6 +191,7 @@
 - 로컬 검증: `pytest -q` **43 passed**, `ruff check src tests` 통과, `mypy src` 통과 (26개 파일).
 - Cloud Run `app:v4` 이미지 빌드 및 리비전 `insurance-claim-mcp-00004-2vr` 배포 완료.
 - 실제 Cline MCP 도구 호출(`insurance-claim__get_onboarding_guide`)이 Cloud Run 원격 서버에서 오류 없이 즉시 성공함을 확인함.
+- 로컬 Antigravity(`~/.gemini/config/mcp_config.json`) 등 stdio 클라이언트에서 단독 실행할 수 있도록 `claim_service.mcp.server`에 `main()`(`init_runtime()` + `mcp.run()`) 진입점과 `get_service()` 지연 초기화를 추가함 (`pytest` 44 passed).
 
 ## 사용자 확보 대기 항목
 - 4세대 실손 표준약관 또는 가입 상품 약관 (약관 수치 `verified` 확정용).
