@@ -20,8 +20,13 @@
 - `generate_pptx.py` 삭제 (발표자료용, 사용자 승인).
 - PoC 파일 5개를 `legacy/`로 이동.
 
+### GitHub 연동 및 다른 PC 재현 (확인 완료)
+- 원격 저장소 `https://github.com/seothief/insurance-claim-mcp` (private)에 `main` push 완료. 원격 HEAD `202dffb`.
+- 커밋 작성자: `seothief83 <seothief83@gmail.com>`.
+- 다른 PC 재현: 원격을 새 폴더에 `git clone` → `python -m venv .venv` → `pip install -r requirements.lock.txt` → `pytest -q` 3 passed → `ruff check src tests` 통과.
+- 교훈: 긴 설치 명령은 셸 출력이 끊기므로, 출력을 파일로 남기고 완료 여부를 확인해야 한다.
+
 ### 남은 항목
-- GitHub 저장소 생성과 push (`gh` CLI 미설치, 인증 방식 확정 필요).
 - Phase 1 이후: 도메인 코어, REST, 보안, MCP 도구, CI, 배포.
 
 ## 사용자 확보 대기 항목
