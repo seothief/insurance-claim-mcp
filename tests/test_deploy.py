@@ -59,6 +59,29 @@ def test_api_rejects_missing_or_wrong_key(keyed_client: TestClient) -> None:
     assert wrong.status_code == 401
 
 
+def test_mcp_without_trailing_slash_does_not_redirect(keyed_client: TestClient) -> None:
+    response = keyed_client.post(
+        "/mcp",
+        headers={
+            "X-API-Key": "secret-test-key",
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        },
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {"name": "test", "version": "1"},
+            },
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 200
+
+
 def test_api_accepts_x_api_key_and_bearer(keyed_client: TestClient) -> None:
     by_header = keyed_client.get("/api/catalog/rules", headers={"X-API-Key": "secret-test-key"})
     assert by_header.status_code == 200

@@ -38,7 +38,17 @@ class ApiKeyMiddleware:
         self._api_key = api_key
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope.get("path") in PUBLIC_PATHS:
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+        # Avoid Starlette's 307 /mcp -> /mcp/ redirect, which downgrades https to http behind
+        # Cloud Run's proxy and is rejected by strict MCP clients.
+        if scope.get("path") == "/mcp":
+            scope["path"] = "/mcp/"
+        if scope.get("path") in PUBLIC_PATHS:
+            await self._app(scope, receive, send)
+            return
+        if not self._api_key:
             await self._app(scope, receive, send)
             return
         provided = _extract_key(scope.get("headers", []))

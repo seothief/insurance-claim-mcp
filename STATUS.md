@@ -160,7 +160,15 @@
 ### 발견한 문제와 조치
 - `/openapi.json`이 키 없이는 401이라 ChatGPT가 스키마를 가져오지 못한다. 스키마에는 사용자 데이터가 없으므로 공개 경로로 바꿨다.
 - ChatGPT Actions는 스키마에 `servers`가 필요하다. 환경변수 `PUBLIC_BASE_URL`을 넣으면 `servers`에 표시되도록 했다.
-- 위 두 가지를 반영한 이미지 `app:v2`를 빌드했고, 아직 Cloud Run에 올리지 않았다 (이 항목은 배포 후 갱신).
+- 위 두 가지를 반영한 이미지 `app:v2` 배포 후, 원격 `/mcp`(끝에 슬래시 없음) 접속 시 Cloud Run 프록시 뒤에서
+  `http://.../mcp/`로 307 리다이렉트가 발생해 MCP 클라이언트가 HTTPS→HTTP 다운그레이드로 차단하는 문제를 발견함.
+- 미들웨어에서 `/mcp`를 내부적으로 `/mcp/`로 정규화하고, `Dockerfile`의 uvicorn에 `--proxy-headers --forwarded-allow-ips=*`를 추가함.
+- MCP 서버에 에이전트 행동 지침(`instructions`)과 `@mcp.prompt()`(`insurance_assistant_prompt`)를 내장하고,
+  `app:v3` 이미지를 빌드해 Cloud Run 리비전 `insurance-claim-mcp-00003-zbg`로 배포 완료.
+- 원격 검증 결과(v3): `https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/mcp`(슬래시 없음) 및 `/mcp/` 모두
+  리다이렉트 없이 도구 10개 + 프롬프트 `insurance_assistant_prompt` 조회 및 호출 통과.
+- 이 PC의 Cline(`cline_mcp_settings.json`)과 Gemini CLI(`~/.gemini/settings.json`)에 원격 MCP 서버 등록 완료.
+- 다중 AI 클라이언트(Gemini, Claude, Cline, ChatGPT) 연결 가이드 `docs/mcp-client-setup.md` 작성.
 - 기본 컴퓨트 서비스 계정에 Cloud Build 권한이 없어 첫 빌드가 실패했다. 4개 역할을 부여해 해결했다.
 
 ### 설계 제안 (미검증)

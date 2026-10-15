@@ -54,8 +54,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     app.include_router(api_router)
     app.mount(MCP_PATH, mcp_app)
     api_key = get_settings().api_key
-    if api_key:
-        app.add_middleware(ApiKeyMiddleware, api_key=api_key)
+    app.add_middleware(ApiKeyMiddleware, api_key=api_key)
     return app
 
 

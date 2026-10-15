@@ -25,4 +25,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import os,urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/api/health' % os.environ.get('PORT','8080'), timeout=4)" || exit 1
 
-CMD ["sh", "-c", "uvicorn claim_service.main:app --app-dir src --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "uvicorn claim_service.main:app --app-dir src --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips=*"]
