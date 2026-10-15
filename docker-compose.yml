@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: claim_service
+      POSTGRES_USER: claim
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-claim_local_only}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U claim -d claim_service"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://claim:${POSTGRES_PASSWORD:-claim_local_only}@db:5432/claim_service
+      API_KEY: ${API_KEY:-}
+      SEED_SAMPLE_DATA: "true"
+      APP_VERSION: ${APP_VERSION:-local}
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

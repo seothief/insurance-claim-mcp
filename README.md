@@ -20,6 +20,12 @@ python -m venv .venv
 - 상태 확인: `GET /api/health`
 - MCP 엔드포인트: `POST /mcp/`
 
+## 데이터베이스
+
+- 기본: 로컬 SQLite (`claim_service.db`, 저장소 밖이 아닌 프로젝트 루트에 생성되며 `.gitignore`로 커밋 제외)
+- 클라우드: 환경변수 `DATABASE_URL`을 PostgreSQL URL로 지정 (예: `postgresql+psycopg://...`, 드라이버 설치 필요)
+- 평가 요청(질병코드, 진료비)은 저장하지 않고 계산 결과만 반환합니다.
+
 ## 테스트
 
 ```powershell

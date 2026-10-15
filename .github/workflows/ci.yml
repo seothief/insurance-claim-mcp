@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install locked dependencies
+        run: |
+          grep -viE '^(pywin32|pywin32-ctypes)' requirements.lock.txt > requirements.linux.txt
+          pip install -r requirements.linux.txt
+      - run: ruff check src tests
+      - run: mypy src
+
+  test-sqlite:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install locked dependencies
+        run: |
+          grep -viE '^(pywin32|pywin32-ctypes)' requirements.lock.txt > requirements.linux.txt
+          pip install -r requirements.linux.txt
+      - name: pytest (SQLite default)
+        run: pytest -q
+
+  test-postgres:
+    runs-on: ubuntu-latest
+    needs: lint
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: claim_service
+          POSTGRES_USER: claim
+          POSTGRES_PASSWORD: ci_only_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U claim -d claim_service"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://claim:ci_only_password@localhost:5432/claim_service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install locked dependencies
+        run: |
+          grep -viE '^(pywin32|pywin32-ctypes)' requirements.lock.txt > requirements.linux.txt
+          pip install -r requirements.linux.txt
+      - name: pytest against PostgreSQL 16
+        run: pytest -q
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    needs: [test-sqlite, test-postgres]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start app + PostgreSQL via compose
+        run: docker compose up -d --build --wait
+      - name: Smoke test REST and MCP endpoints
+        run: |
+          set -e
+          curl -fsS http://localhost:8080/api/health
+          curl -fsS http://localhost:8080/api/catalog/rules | python3 -c "import sys,json; assert json.load(sys.stdin)"
+          curl -fsS http://localhost:8080/api/users/user_123/policies | python3 -c "import sys,json; assert len(json.load(sys.stdin)) == 2"
+          status=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8080/mcp/ -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}')
+          echo "MCP initialize HTTP status: $status"
+          test "$status" = "200"
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

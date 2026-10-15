@@ -21,6 +21,9 @@ gha-creds-*.json
 # Local scratch files
 *.tmp.txt
 
+# Local SQLite databases (contain user policy data, never commit)
+*.db
+
 # Editor / OS
 .vscode/
 .idea/

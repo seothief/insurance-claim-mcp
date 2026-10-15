@@ -1,0 +1,52 @@
+name: Deploy to Cloud Run
+
+# Runs only after CI passes on main, or manually. Requires repository variables and secrets:
+#   vars.GCP_PROJECT_ID, vars.GCP_REGION, vars.GAR_REPOSITORY (Artifact Registry repo name)
+#   secrets.GCP_WORKLOAD_IDENTITY_PROVIDER, secrets.GCP_SERVICE_ACCOUNT
+#   secrets.DATABASE_URL (PostgreSQL URL, e.g. Cloud SQL), secrets.API_KEY
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      SERVICE: insurance-claim-mcp
+      REGION: ${{ vars.GCP_REGION }}
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/insurance-claim-mcp:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+      - name: Build and push image
+        run: |
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --image "$IMAGE" \
+            --region "$REGION" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars "APP_VERSION=${{ github.sha }}" \
+            --set-secrets "DATABASE_URL=DATABASE_URL:latest,API_KEY=API_KEY:latest"
+      - name: Verify health endpoint
+        run: |
+          url=$(gcloud run services describe "$SERVICE" --region "$REGION" --project "${{ vars.GCP_PROJECT_ID }}" --format 'value(status.url)')
+          curl -fsS "$url/api/health"
