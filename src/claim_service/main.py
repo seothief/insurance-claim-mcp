@@ -41,11 +41,11 @@ def create_app(database_url: str | None = None) -> FastAPI:
         lifespan=combine_lifespans(_db_lifespan(database_url), mcp_app.lifespan),
     )
 
-    @app.get("/api/health")
+    @app.get("/api/health", include_in_schema=False)
     def health() -> dict[str, Any]:
         return {"status": "ok"}
 
-    @app.get("/api/version")
+    @app.get("/api/version", include_in_schema=False)
     def version() -> JSONResponse:
         return JSONResponse({"service": "insurance-claim-mcp", "version": APP_VERSION})
 

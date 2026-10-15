@@ -107,11 +107,44 @@
 - Cloud Run 배포는 GCP 프로젝트, Workload Identity, DB URL, `API_KEY` 시크릿 준비 후에만 동작함.
 - `--allow-unauthenticated`로 배포하므로 `API_KEY`가 유일한 보호 수단임.
 
+### CI 결과 (사용자가 GitHub Actions 화면으로 확인)
+- CI #1 (`02a801c`), CI #2 (`1137e7c`) 모두 성공 (각 약 2분 21초, 2분 35초).
+- CI #2부터 `test-postgres` 잡이 `TEST_DATABASE_URL`로 PostgreSQL 16을 실제로 사용함.
+- 잡별 세부 결과는 화면 요약만 확인했고 개별 로그는 보지 못함.
+
 ### 남은 항목
-- GitHub Actions 실행 결과 확인 및 실패 시 수정.
 - 이 PC에서 WSL2 설치(관리자 권한, 재부팅 가능) 후 `docker compose up`으로 로컬 PostgreSQL 검증.
 - GCP 프로젝트 결정 후 Cloud Run 배포 설정.
 - 사용자 보험 프로필 내보내기/가져오기, 약관 원문 대조.
+
+## Phase 1-D. ChatGPT 모바일 사용자 대응 — 코드와 문서 작성 완료, 실제 GPT 연결은 미검증
+
+### 전제 조건 (사용자 지정)
+- 사용자는 스마트폰에 ChatGPT 앱만 설치한 일반인이다. MCP 설정, user_id, 질병코드 같은 용어를 모른다.
+- 사용자가 할 수 있는 일은 앱 화면 캡처, 영수증과 약봉투 사진 촬영, 채팅이다.
+
+### 확인된 사실 (실제 실행 결과)
+- `pytest -q` 38 passed, `ruff check src tests` 통과, `mypy src` 통과 (25개 파일).
+- OpenAPI 3.1.0 스키마에 경로 9개, 작업 10개가 있다 (health, version 제외). 확인한 뒤 모든 작업에
+  영어 camelCase `operationId`와 한글 요약·설명을 붙였다: `registerUser`, `getUserProfile`, `registerPolicy`,
+  `listPolicies`, `deletePolicy`, `updateRiderAmount`, `resolveRider`, `evaluateClaim`, `getOnboardingGuide`,
+  `listStandardRules`. (처음 확인 시 `/api/catalog/rules`만 자동 생성 이름이어서 추가로 고침)
+- `/api/health`, `/api/version`은 스키마에서 제외함 (GPT 도구로 노출할 필요가 없음).
+- 온보딩 가이드에 일반인용 화면 캡처 안내(`capture_guide_for_users`)를 추가함.
+
+### 구현 내용
+- `docs/chatgpt-custom-gpt-guide.md`: Custom GPT 만드는 순서, 붙여넣기용 지침, API 키 인증 설정, 알려진 한계.
+
+### 설계 제안 (미검증)
+- ChatGPT의 GPT Actions가 이 스키마를 문제없이 읽고 호출하는지는 직접 해 보지 못했다.
+- 사용자별 인증이 없다. GPT가 공유하는 `API_KEY` 하나로는 사용자를 구분하지 못하고, 별명(`user_id`)을 아는 사람은
+  그 사용자의 보험 정보를 조회할 수 있다. 일반 공개 전에 사용자별 인증이 필요하다.
+- 개인 보험 정보를 서버 DB에 저장하므로 개인정보 처리방침과 보관 기간 정책이 필요하다.
+- ChatGPT 이미지 판독 오류 가능성 때문에 등록 전에 사용자 확인 단계를 지침에 넣었다.
+
+### 남은 항목
+- 서버를 https 주소로 배포한 뒤 Custom GPT를 만들어 실제로 등록과 계산이 되는지 시험.
+- 사용자별 인증 설계, 개인정보 처리방침.
 
 ## 사용자 확보 대기 항목
 - 4세대 실손 표준약관 또는 가입 상품 약관 (약관 수치 `verified` 확정용).
