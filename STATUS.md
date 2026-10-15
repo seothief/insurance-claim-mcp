@@ -85,6 +85,34 @@
 - 약관 원문 대조 후 `verified` 전환.
 - 사용자 인증 설계.
 
+## Phase 1-C. PostgreSQL · Docker · CI/CD 구성 — 코드 작성 완료, 실행 검증 일부 대기
+
+### 확인된 사실 (실제 실행 결과)
+- 로컬 `pytest -q`: 38 passed (SQLite), `ruff check src tests` 통과, `mypy src` 통과 (25개 파일).
+- `psycopg[binary]==3.2.9` 설치 및 `requirements.lock.txt` 반영 확인 (`pip install --dry-run` 모두 satisfied).
+- 브랜치 `feat/policy-management-db`를 원격에 푸시함 (커밋 `02a801c`).
+- 이 PC에 Docker Desktop 설치됨 (CLI 29.8.2, Compose v5.6.0). 그러나 WSL2가 없어 엔진이 시작되지 않음 (`Docker Desktop is unable to start`).
+  관리자 권한이 필요한 `wsl --install`은 실행되지 않았음 (UAC 미승인 추정). 이 PC에서의 컨테이너 실행은 아직 검증하지 못함.
+
+### 구현 내용
+- `create_db_engine`: `postgres://`, `postgresql://` URL을 `postgresql+psycopg://`로 정규화, PostgreSQL에 `pool_pre_ping` 적용.
+- 선택적 API Key 보호: `API_KEY` 설정 시 `/api/health`, `/api/version` 외 모든 요청에 `X-API-Key` 또는 `Authorization: Bearer` 필요.
+- `Dockerfile`, `.dockerignore`, `docker-compose.yml` (postgres:16-alpine + 앱, 헬스체크 연동).
+- `.github/workflows/ci.yml`: lint(ruff, mypy), SQLite 테스트, PostgreSQL 16 서비스 컨테이너 테스트, docker compose 스모크 테스트.
+- `.github/workflows/deploy-cloudrun.yml`: Cloud Run 배포 (저장소 변수/시크릿 설정 필요).
+- 테스트는 `TEST_DATABASE_URL`이 있으면 해당 DB(PostgreSQL)에서 실행됨. CI의 PostgreSQL 잡에 이 변수를 연결함.
+
+### 설계 제안 (미검증)
+- GitHub Actions 결과(특히 PostgreSQL 잡, docker-smoke 잡)는 아직 확인하지 못함. 비공개 저장소라 이 PC에서 API로 조회할 수 없음.
+- Cloud Run 배포는 GCP 프로젝트, Workload Identity, DB URL, `API_KEY` 시크릿 준비 후에만 동작함.
+- `--allow-unauthenticated`로 배포하므로 `API_KEY`가 유일한 보호 수단임.
+
+### 남은 항목
+- GitHub Actions 실행 결과 확인 및 실패 시 수정.
+- 이 PC에서 WSL2 설치(관리자 권한, 재부팅 가능) 후 `docker compose up`으로 로컬 PostgreSQL 검증.
+- GCP 프로젝트 결정 후 Cloud Run 배포 설정.
+- 사용자 보험 프로필 내보내기/가져오기, 약관 원문 대조.
+
 ## 사용자 확보 대기 항목
 - 4세대 실손 표준약관 또는 가입 상품 약관 (약관 수치 `verified` 확정용).
 - GCP 프로젝트 결정 (Phase 6 전).

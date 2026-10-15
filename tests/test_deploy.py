@@ -1,5 +1,6 @@
 ﻿"""Deployment-related behaviour: DB URL normalisation and the optional API-key guard."""
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -18,14 +19,14 @@ def test_postgres_urls_use_psycopg_driver() -> None:
 
 
 @pytest.fixture
-def keyed_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+def keyed_client(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fresh_external_schema: None
+) -> Iterator[TestClient]:
     monkeypatch.setenv("API_KEY", "secret-test-key")
     get_settings.cache_clear()
     app = create_app(database_url_for(tmp_path, "keyed.db"))
-    client = TestClient(app)
-    client.__enter__()
-    yield client
-    client.__exit__(None, None, None)
+    with TestClient(app) as client:
+        yield client
     monkeypatch.delenv("API_KEY")
     get_settings.cache_clear()
 
