@@ -10,6 +10,8 @@
 - **인증 헤더**: `X-API-Key: <서버 API_KEY>` 또는 `Authorization: Bearer <서버 API_KEY>`
   (주 작업 PC의 키 위치: `C:\Users\seoth\secrets\api_key.txt`, 클라우드: GCP Secret Manager `API_KEY`)
 
+모든 요청에는 서버 공용 `X-API-Key`가 필요합니다. 사용자 데이터가 필요한 AI 클라이언트는 본인의 `X-User-Id`를 설정해 해당 별명에 요청을 귀속시킬 수 있습니다. 사용자 ID는 인증 수단이 아니며, 이를 통해 PIN 보호가 해제되지 않습니다. PIN 보호 계정은 `X-User-Pin` 또는 도구의 PIN 입력도 필요합니다.
+
 ---
 
 ## 1. Google Gemini CLI (`@google/gemini-cli`) 연결
@@ -26,7 +28,8 @@
        "insurance-claim": {
          "httpUrl": "https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/mcp",
          "headers": {
-           "X-API-Key": "<API_KEY>"
+             "X-API-Key": "<서버 공용 API_KEY>",
+             "X-User-Id": "<내 별명>"
          }
        }
      }
@@ -47,7 +50,8 @@ MCP 설정 JSON(예: Cline의 `cline_mcp_settings.json`)에 아래 항목을 추
       "url": "https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/mcp",
       "type": "streamableHttp",
       "headers": {
-        "X-API-Key": "<API_KEY>"
+        "X-API-Key": "<서버 공용 API_KEY>",
+        "X-User-Id": "<내 별명>"
       },
       "disabled": false,
       "autoApprove": [
@@ -75,13 +79,14 @@ Antigravity의 MCP 설정 파일(`C:\Users\<사용자>\.gemini\config\mcp_config
     "insurance-claim": {
       "serverUrl": "https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/mcp",
       "headers": {
-        "X-API-Key": "<API_KEY>"
+        "X-API-Key": "<서버 공용 API_KEY>",
+        "X-User-Id": "<내 별명>"
       }
     }
   }
 }
 ```
-- 본인 전용으로 고정하려면 `"headers"`에 `"X-User-Id": "<내 별명>"`, `"X-User-Pin": "<내 PIN>"`을 함께 넣을 수 있습니다.
+- PIN 보호 계정이면 본인 전용 설정의 `"headers"`에 `"X-User-Pin": "<내 PIN>"`도 추가합니다. 공용 `X-API-Key`는 서버 접근 인증이며 사용자별 인증이 아니므로 안전하게 보호하세요.
 
 
 ---

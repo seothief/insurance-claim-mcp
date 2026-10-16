@@ -25,6 +25,7 @@ python -m venv .venv
 - 기본: 로컬 SQLite (`claim_service.db`, 저장소 밖이 아닌 프로젝트 루트에 생성되며 `.gitignore`로 커밋 제외)
 - 클라우드: 환경변수 `DATABASE_URL`을 PostgreSQL URL로 지정 (예: `postgresql+psycopg://...`, 드라이버 설치 필요)
 - 평가 요청(질병코드, 진료비)은 저장하지 않고 계산 결과만 반환합니다.
+- REST/MCP 접근은 서버 공용 `X-API-Key`로 인증합니다. `X-User-Id`는 요청을 특정 사용자 별명에 귀속시키며 인증을 대체하지 않습니다. PIN 보호 계정은 PIN 확인을 유지합니다. [클라이언트 연결 가이드](docs/mcp-client-setup.md)를 참조하세요.
 
 ## 테스트
 

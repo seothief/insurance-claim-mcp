@@ -1,4 +1,4 @@
-﻿"""Deployment-related behaviour: DB URL normalisation and the optional API-key guard."""
+"""Deployment-related behaviour: DB URL normalisation and the optional API-key guard."""
 
 from collections.abc import Iterator
 from pathlib import Path
@@ -57,6 +57,12 @@ def test_api_rejects_missing_or_wrong_key(keyed_client: TestClient) -> None:
     assert keyed_client.get("/api/catalog/rules").status_code == 401
     wrong = keyed_client.get("/api/catalog/rules", headers={"X-API-Key": "nope"})
     assert wrong.status_code == 401
+    user_identity_is_not_auth = keyed_client.get(
+        "/api/catalog/rules",
+        headers={"X-User-Id": "seoth", "X-User-Key": "legacy-user-key"},
+    )
+    assert user_identity_is_not_auth.status_code == 401
+
 
 
 def test_mcp_without_trailing_slash_does_not_redirect(keyed_client: TestClient) -> None:
@@ -116,4 +122,3 @@ def test_pin_protected_user_blocks_wrong_pin_and_allows_correct_pin(
 def test_bound_user_header_prevents_cross_user_access(keyed_client: TestClient) -> None:
     bound_headers = {"X-API-Key": "secret-test-key", "X-User-Id": "seoth"}
     assert keyed_client.get("/api/users/user_123", headers=bound_headers).status_code == 403
-

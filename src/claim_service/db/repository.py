@@ -10,7 +10,12 @@ from typing import Any, Literal
 
 from sqlalchemy import Connection, Engine, RowMapping, delete, insert, select, update
 
-from claim_service.db.tables import coverage_rules, user_policies, user_policy_riders, users
+from claim_service.db.tables import (
+    coverage_rules,
+    user_policies,
+    user_policy_riders,
+    users,
+)
 from claim_service.domain.errors import DuplicateRiderError
 from claim_service.domain.models import CoverageRule, MappingStatus, PolicyOut, RiderOut, UserIn
 
@@ -123,8 +128,6 @@ class PolicyRepository:
 
     def user_exists(self, user_id: str) -> bool:
         return self.get_user(user_id) is not None
-
-
 
     # ---- policies -------------------------------------------------------
     def list_policies(self, user_id: str) -> list[PolicyOut]:

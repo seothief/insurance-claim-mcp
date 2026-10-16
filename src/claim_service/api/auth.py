@@ -22,7 +22,9 @@ Send = Callable[[Message], Awaitable[None]]
 ASGIApp = Callable[[Scope, Receive, Send], Awaitable[None]]
 
 
-def _extract_headers(headers: list[tuple[bytes, bytes]]) -> tuple[str, str | None, str | None]:
+def _extract_headers(
+    headers: list[tuple[bytes, bytes]],
+) -> tuple[str, str | None, str | None]:
     api_key = ""
     bound_user: str | None = None
     header_pin: str | None = None
@@ -59,12 +61,11 @@ class ApiKeyMiddleware:
         if scope.get("path") in PUBLIC_PATHS:
             await self._app(scope, receive, send)
             return
-        provided, bound_user, header_pin = _extract_headers(scope.get("headers", []))
-        set_request_identity(bound_user, header_pin)
-        if not self._api_key:
-            await self._app(scope, receive, send)
-            return
-        if not hmac.compare_digest(provided.encode(), self._api_key.encode()):
+        provided, requested_user, header_pin = _extract_headers(scope.get("headers", []))
+        server_key_valid = bool(self._api_key) and hmac.compare_digest(
+            provided.encode(), self._api_key.encode()
+        )
+        if self._api_key and not server_key_valid:
             body = b'{"detail":"invalid or missing API key"}'
             await send({
                 "type": "http.response.start",
@@ -74,6 +75,7 @@ class ApiKeyMiddleware:
             })
             await send({"type": "http.response.body", "body": body})
             return
+        set_request_identity(requested_user, header_pin)
         try:
             await self._app(scope, receive, send)
         finally:
