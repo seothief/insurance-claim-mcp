@@ -13,6 +13,7 @@ from claim_service.domain.models import ClaimInput, PolicyOut, RiderOut
 
 TOOLS: tuple[tuple[str, str], ...] = (
     ("get_onboarding_guide", "시작할 때 가장 먼저 호출. 등록 절차와 지원 담보 안내"),
+    ("get_document_request_guide", "보험사에 증권을 공식 경로로 요청하는 안내와 요청 문구"),
     ("register_user", "사용자 등록 (별명과 PIN)"),
     ("get_user_profile", "등록 현황 조회: 보험 수, 확인이 필요한 특약"),
     ("list_standard_rules", "지원하는 표준 담보 목록과 검증 여부"),
@@ -52,18 +53,21 @@ def _example() -> str:
         company="예시화재",
         product_name="예시 종합보험",
         policy_type="COMPREHENSIVE",
+        source_type="POLICY_CERTIFICATE",
         riders=[
             RiderOut(
                 rider_id="r1",
                 rider_name="골절진단비",
                 coverage_amount=300000,
                 mapped_rule_id="FRACTURE_DIAGNOSIS",
+                source_type="POLICY_CERTIFICATE",
             ),
             RiderOut(
                 rider_id="r2",
                 rider_name="깁스치료비",
                 coverage_amount=500000,
                 mapped_rule_id="CAST_TREATMENT",
+                source_type="POLICY_CERTIFICATE",
             ),
         ],
     )
@@ -122,7 +126,7 @@ def build_markdown() -> str:
 가입: 골절진단비 300,000원, 깁스치료비 500,000원 (가상 데이터)
 
 {_example()}
-## 제공 도구 (MCP, 10개)
+## 제공 도구 (MCP, {len(TOOLS)}개)
 {tools}
 
 ## 지원하는 담보

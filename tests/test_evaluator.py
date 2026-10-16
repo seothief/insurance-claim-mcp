@@ -14,6 +14,7 @@ def _rider(
     status: str = "MAPPED",
     custom: dict[str, object] | None = None,
 ) -> RiderOut:
+    # These fixtures model a policy certificate, the only source the engine calculates from.
     return RiderOut(
         rider_id=f"id-{name}",
         rider_name=name,
@@ -21,6 +22,7 @@ def _rider(
         mapped_rule_id=rule_id,
         mapping_status=status,  # type: ignore[arg-type]
         custom_rule_config=custom,
+        source_type="POLICY_CERTIFICATE",
     )
 
 
@@ -32,6 +34,7 @@ def _silson(generation: int | None = 4) -> PolicyOut:
         policy_type="SILSON",
         silson_generation=generation,
         riders=[],
+        source_type="POLICY_CERTIFICATE",
     )
 
 
@@ -42,6 +45,7 @@ def _comprehensive(*riders: RiderOut) -> PolicyOut:
         product_name="테스트 종합",
         policy_type="COMPREHENSIVE",
         riders=list(riders),
+        source_type="POLICY_CERTIFICATE",
     )
 
 

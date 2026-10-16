@@ -56,6 +56,9 @@ user_policies = Table(
     Column("policy_type", String(32), nullable=False),
     Column("silson_generation", Integer, nullable=True),
     Column("enrolled_year", Integer, nullable=True),
+    Column("source_type", String(32), nullable=False, default="USER_STATED"),
+    Column("issuer", String(100), nullable=True),
+    Column("issued_on", String(10), nullable=True),
     Column("is_active", Boolean, nullable=False, default=True),
     UniqueConstraint("user_id", "company", "product_name", name="uq_user_policy_identity"),
 )
@@ -81,6 +84,11 @@ user_policy_riders = Table(
     Column("coverage_amount", Integer, nullable=False),
     Column("mapping_status", String(32), nullable=False, default="MAPPED"),
     Column("custom_rule_config", JSON, nullable=True),
+    # Source of the rider data. Only POLICY_CERTIFICATE may be calculated; existing rows are
+    # migrated to USER_STATED. Issuer and date are kept; no policy number or personal data.
+    Column("source_type", String(32), nullable=False, default="USER_STATED"),
+    Column("issuer", String(100), nullable=True),
+    Column("issued_on", String(10), nullable=True),
     UniqueConstraint("policy_id", "rider_name", name="uq_policy_rider_name"),
 )
 

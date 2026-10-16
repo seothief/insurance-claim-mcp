@@ -22,6 +22,7 @@ def _rider(
         mapped_rule_id=rule_id,
         mapping_status=status,  # type: ignore[arg-type]
         custom_rule_config=custom,
+        source_type="POLICY_CERTIFICATE",
     )
 
 
@@ -32,6 +33,7 @@ def _comprehensive(*riders: RiderOut) -> PolicyOut:
         product_name="테스트 종합",
         policy_type="COMPREHENSIVE",
         riders=list(riders),
+        source_type="POLICY_CERTIFICATE",
     )
 
 

@@ -39,8 +39,34 @@ def create_db_engine(database_url: str) -> Engine:
 
 def init_schema(engine: Engine) -> None:
     metadata.create_all(engine)
-    # Lightweight additive migration for existing databases created before pin_hash existed.
+    # Lightweight additive migrations for databases created before a column existed.
     with engine.begin() as conn:
         columns = {col["name"] for col in inspect(conn).get_columns("users")}
         if "pin_hash" not in columns:
             conn.execute(text("ALTER TABLE users ADD COLUMN pin_hash VARCHAR(128)"))
+    with engine.begin() as conn:
+        policy_columns = {col["name"] for col in inspect(conn).get_columns("user_policies")}
+        if "source_type" not in policy_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE user_policies "
+                    "ADD COLUMN source_type VARCHAR(32) NOT NULL DEFAULT 'USER_STATED'"
+                )
+            )
+        if "issuer" not in policy_columns:
+            conn.execute(text("ALTER TABLE user_policies ADD COLUMN issuer VARCHAR(100)"))
+        if "issued_on" not in policy_columns:
+            conn.execute(text("ALTER TABLE user_policies ADD COLUMN issued_on VARCHAR(10)"))
+    with engine.begin() as conn:
+        rider_columns = {col["name"] for col in inspect(conn).get_columns("user_policy_riders")}
+        if "source_type" not in rider_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE user_policy_riders "
+                    "ADD COLUMN source_type VARCHAR(32) NOT NULL DEFAULT 'USER_STATED'"
+                )
+            )
+        if "issuer" not in rider_columns:
+            conn.execute(text("ALTER TABLE user_policy_riders ADD COLUMN issuer VARCHAR(100)"))
+        if "issued_on" not in rider_columns:
+            conn.execute(text("ALTER TABLE user_policy_riders ADD COLUMN issued_on VARCHAR(10)"))

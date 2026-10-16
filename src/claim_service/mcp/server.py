@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from fastmcp import FastMCP
 
+from claim_service.domain.document_guide import PolicyKind, request_guide
 from claim_service.domain.errors import DomainError
 from claim_service.domain.models import (
     ClaimInput,
@@ -27,9 +28,16 @@ ASSISTANT_INSTRUCTIONS = (
     "get_user_profile을 호출한다. bound_user_id가 없으면 사용할 별명(user_id)과 "
     "본인 확인용 PIN(4자리 이상)을 물어본 뒤 get_user_profile 또는 "
     "register_user를 호출한다.\n"
-    "3. 보험증권이나 보험앱 캡처 이미지를 받으면 보험사, 상품명, 가입연도, 실손세대, 특약명, "
-    "가입금액(원 단위 정수)을 추출해 사용자에게 요약해 보여주고, 맞는지 확인받은 뒤 "
-    "register_user_policy를 호출한다. 불확실한 숫자는 추측하지 말고 되묻는다.\n"
+    "3. 보험증권 이미지를 받으면 보험사, 상품명, 가입연도, 실손세대, 특약명, 가입금액(원 단위 "
+    "정수)을 추출해 사용자에게 요약해 보여주고, 맞는지 확인받은 뒤 register_user_policy를 "
+    "호출한다. 증권에서 읽은 특약은 source_type=POLICY_CERTIFICATE로, 발급처와 발급일을 issuer, "
+    "issued_on으로 보낸다. 증권이 아닌 자료(리포트, 가공된 분석 결과, 말로만 한 내용)에서 읽은 "
+    "특약은 source_type=USER_STATED로 보내며, 그 특약은 계산되지 않는다는 것을 알린다. "
+    "불확실한 숫자는 추측하지 말고 되묻는다.\n"
+    "3-1. 증권이 없어 등록할 수 없으면 get_document_request_guide로 받아야 할 서류 목록과 "
+    "요청 문구를 가져와 사용자에게 안내한다. 보험사 공식 경로(공식 앱, 공식 홈페이지, 고객센터, "
+    "우편·이메일·팩스·지점)만 안내한다. 제3자 앱이나 조회 사이트, 스크래핑, 보안 프로그램 우회 "
+    "방법은 절대 안내하지 않는다. PC가 막히면 휴대폰 공식 앱이나 고객센터를 안내한다.\n"
     "4. register_user_policy 결과에 unresolved_riders가 있으면 ai_follow_up_prompt를 참고해 "
     "증권을 다시 확인하거나 사용자에게 쉬운 말로 질문한 뒤 resolve_user_rider로 확정한다.\n"
     "5. 병원 영수증·처방전·약봉투 사진을 받으면 급여/비급여 금액, 병원 종별, 질병코드(KCD), "
@@ -55,6 +63,25 @@ def _guard[T](call: Callable[[], T]) -> T:
         return call()
     except DomainError as exc:
         raise ValueError(str(exc)) from exc
+
+
+@mcp.tool()
+def get_document_request_guide(
+    policy_type: PolicyType, product_name: str
+) -> dict[str, object]:
+    """보험사에 요청해야 할 증권과 약관 목록, 요청 문구, 공식 요청 경로를 돌려줍니다."""
+    kind: PolicyKind = "OTHER" if policy_type == "OTHER" else _to_guide_kind(policy_type)
+    return request_guide(kind, product_name)
+
+
+def _to_guide_kind(policy_type: str) -> PolicyKind:
+    mapping: dict[str, PolicyKind] = {
+        "SILSON": "SILSON",
+        "COMPREHENSIVE": "COMPREHENSIVE",
+        "DRIVER": "DRIVER",
+        "FIXED_BENEFIT": "FIXED_BENEFIT",
+    }
+    return mapping.get(policy_type, "OTHER")
 
 
 @mcp.tool()

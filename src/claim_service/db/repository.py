@@ -29,6 +29,9 @@ class RiderPlan:
     mapping_status: MappingStatus
     custom_rule_config: dict[str, Any] | None
     explicit_mapping: bool
+    source_type: str = "USER_STATED"
+    issuer: str | None = None
+    issued_on: str | None = None
 
 
 class PolicyRepository:
@@ -179,6 +182,9 @@ class PolicyRepository:
                         policy_type=policy.policy_type,
                         silson_generation=policy.silson_generation,
                         enrolled_year=policy.enrolled_year,
+                        source_type=policy.source_type,
+                        issuer=policy.issuer,
+                        issued_on=policy.issued_on,
                         is_active=True,
                     )
                 )
@@ -192,6 +198,9 @@ class PolicyRepository:
                         policy_type=policy.policy_type,
                         silson_generation=policy.silson_generation,
                         enrolled_year=policy.enrolled_year,
+                        source_type=policy.source_type,
+                        issuer=policy.issuer,
+                        issued_on=policy.issued_on,
                         is_active=True,
                     )
                 )
@@ -231,10 +240,19 @@ class PolicyRepository:
                         mapping_status=rider.mapping_status,
                         custom_rule_config=rider.custom_rule_config,
                         coverage_amount=rider.coverage_amount,
+                        source_type=rider.source_type,
+                        issuer=rider.issuer,
+                        issued_on=rider.issued_on,
                     )
                 )
                 continue
-            values: dict[str, Any] = {"coverage_amount": rider.coverage_amount}
+            # The source describes the latest document, so it is refreshed on every registration.
+            values: dict[str, Any] = {
+                "coverage_amount": rider.coverage_amount,
+                "source_type": rider.source_type,
+                "issuer": rider.issuer,
+                "issued_on": rider.issued_on,
+            }
             # Overwrite the mapping only when it is unresolved or the caller set it explicitly.
             # A confirmed mapping (MAPPED / CUSTOM / IGNORED) is kept on re-registration.
             unresolved = current["mapping_status"] == "NEEDS_CLARIFICATION"
@@ -312,6 +330,9 @@ class PolicyRepository:
             mapped_rule_id=row["mapped_rule_id"],
             mapping_status=row["mapping_status"],
             custom_rule_config=row["custom_rule_config"],
+            source_type=row["source_type"] or "USER_STATED",
+            issuer=row["issuer"],
+            issued_on=row["issued_on"],
         )
 
     @staticmethod
@@ -332,5 +353,8 @@ class PolicyRepository:
             policy_type=row["policy_type"],
             silson_generation=row["silson_generation"],
             enrolled_year=row["enrolled_year"],
+            source_type=row["source_type"] or "USER_STATED",
+            issuer=row["issuer"],
+            issued_on=row["issued_on"],
             riders=[PolicyRepository._to_rider(r) for r in rider_rows],
         )

@@ -20,8 +20,8 @@ def test_seeded_sample_user_is_ready_when_mapped(client: TestClient) -> None:
     assert len(policies) == 2
     comprehensive = next(p for p in policies if p["policy_type"] == "COMPREHENSIVE")
     mapped = {r["rider_name"]: r["mapped_rule_id"] for r in comprehensive["riders"]}
-    assert mapped["골절진단비(치아파열제외)"] == "FRACTURE_DIAGNOSIS"
-    assert mapped["깁스치료비"] == "CAST_TREATMENT"
+    assert mapped["골절진단비(샘플)"] == "FRACTURE_DIAGNOSIS"
+    assert mapped["깁스치료비(샘플)"] == "CAST_TREATMENT"
     assert client.get(f"/api/users/{SAMPLE}").json()["onboarding_status"] == "READY"
 
 

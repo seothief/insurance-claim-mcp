@@ -117,7 +117,8 @@ def test_other_users_cannot_modify_my_rider(client: TestClient) -> None:
     assert response.status_code == 404
 
 
-def test_evaluate_endpoint_returns_estimates(client: TestClient) -> None:
+def test_sample_user_is_never_calculated(client: TestClient) -> None:
+    """The synthetic sample is not a real policy: it has no certificate source, so no payout."""
     body = {
         "kcd_code": "S82.1",
         "treatment_name": "석고붕대(통깁스)",
@@ -126,12 +127,57 @@ def test_evaluate_endpoint_returns_estimates(client: TestClient) -> None:
         "hospital_type": "clinic",
     }
     result = client.post(f"/api/users/{SAMPLE}/evaluate", json=body).json()
-    assert result["total_estimated_payout"] > 0
+    assert result["total_estimated_payout"] == 0
+    assert result["matched_benefits"] == []
     assert result["disclaimer"]
-    statuses = {b["rider_name"]: b["status"] for b in result["matched_benefits"]}
-    assert statuses["골절진단비(치아파열제외)"] == "ELIGIBLE"
-    assert statuses["깁스치료비"] == "ELIGIBLE"
-    assert result["pending_riders"] == []
+    assert result["unverified_source_riders"]
+    assert any("샘플보험사A" in item for item in result["unverified_source_riders"])
+    assert any("골절진단비(샘플)" in item for item in result["unverified_source_riders"])
+
+
+def test_certified_policy_is_calculated(client: TestClient) -> None:
+    _new_user(client)
+    body = {
+        "company": "테스트보험사",
+        "product_name": "증권 확인 종합보험",
+        "policy_type": "COMPREHENSIVE",
+        "source_type": "POLICY_CERTIFICATE",
+        "issuer": "테스트보험사",
+        "issued_on": "2021-03-02",
+        "riders": [
+            {
+                "rider_name": "골절진단비",
+                "coverage_amount": 300000,
+                "source_type": "POLICY_CERTIFICATE",
+                "issuer": "테스트보험사",
+                "issued_on": "2021-03-02",
+            }
+        ],
+    }
+    assert client.post("/api/users/me/policies", json=body).status_code == 200
+    result = client.post(
+        "/api/users/me/evaluate",
+        json={"kcd_code": "S82.1", "treatment_name": "골절", "cost_covered": 1000},
+    ).json()
+    assert result["total_estimated_payout"] == 300000
+    assert result["unverified_source_riders"] == []
+
+
+def test_user_stated_rider_is_not_calculated_even_if_it_matches(client: TestClient) -> None:
+    _new_user(client)
+    body = {
+        "company": "테스트보험사",
+        "product_name": "말로만 한 종합보험",
+        "policy_type": "COMPREHENSIVE",
+        "riders": [{"rider_name": "골절진단비", "coverage_amount": 300000}],
+    }
+    assert client.post("/api/users/me/policies", json=body).status_code == 200
+    result = client.post(
+        "/api/users/me/evaluate",
+        json={"kcd_code": "S82.1", "treatment_name": "골절", "cost_covered": 1000},
+    ).json()
+    assert result["total_estimated_payout"] == 0
+    assert any("골절진단비" in item for item in result["unverified_source_riders"])
 
 
 def test_mcp_lists_onboarding_and_policy_tools(client: TestClient) -> None:
@@ -143,6 +189,7 @@ def test_mcp_lists_onboarding_and_policy_tools(client: TestClient) -> None:
     names = set(asyncio.run(run()))
     expected = {
         "get_onboarding_guide",
+        "get_document_request_guide",
         "register_user",
         "get_user_profile",
         "register_user_policy",
@@ -160,4 +207,27 @@ def test_mcp_tool_call_works_over_in_memory_client(client: TestClient) -> None:
 
     guide = asyncio.run(run())
     assert guide["trigger_phrase"] == "보험비서 시작"
+
+
+def test_mcp_document_request_guide_uses_official_channels_only() -> None:
+    async def run() -> dict[str, object]:
+        async with Client(mcp) as mcp_client:
+            result = await mcp_client.call_tool(
+                "get_document_request_guide",
+                {"policy_type": "COMPREHENSIVE", "product_name": "테스트 종합보험"},
+            )
+            return dict(result.data)  # type: ignore[arg-type]
+
+    guide = asyncio.run(run())
+    assert guide["product_name"] == "테스트 종합보험"
+    channels = guide["where_to_request"]
+    assert channels == [
+        "보험사 공식 앱",
+        "보험사 공식 홈페이지의 본인 로그인 메뉴",
+        "보험사 고객센터(전화, 채팅)",
+        "보험사가 제공하는 우편, 이메일, 팩스, 지점 발급",
+    ]
+    response_text = " ".join(str(item) for item in [*channels, *guide["not_accepted"]])
+    prohibited_terms = ("토스", "뱅크샐러드", "화면 캡처", "스크래핑")
+    assert not any(term in response_text for term in prohibited_terms)
 

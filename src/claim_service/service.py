@@ -107,6 +107,9 @@ class PolicyService:
             policy_type=policy.policy_type,
             silson_generation=generation,
             enrolled_year=policy.enrolled_year,
+            source_type=policy.source_type,
+            issuer=policy.issuer,
+            issued_on=policy.issued_on,
         )
         plan = [self._plan_rider(rider, rules) for rider in policy.riders]
         action, stored = self._repo.save_policy(
@@ -181,6 +184,9 @@ class PolicyService:
             mapping_status="MAPPED" if matched else "NEEDS_CLARIFICATION",
             custom_rule_config=None,
             explicit_mapping=False,
+            source_type=rider.source_type,
+            issuer=rider.issuer,
+            issued_on=rider.issued_on,
         )
 
     @staticmethod

@@ -193,6 +193,21 @@
 - 실제 Cline MCP 도구 호출(`insurance-claim__get_onboarding_guide`)이 Cloud Run 원격 서버에서 오류 없이 즉시 성공함을 확인함.
 - 로컬 Antigravity(`~/.gemini/config/mcp_config.json`) 등 stdio 클라이언트에서 단독 실행할 수 있도록 `claim_service.mcp.server`에 `main()`(`init_runtime()` + `mcp.run()`) 진입점과 `get_service()` 지연 초기화를 추가함 (`pytest` 44 passed).
 
+## Phase 1-H. 보험증권 출처 검증 — 로컬 완료 (브랜치 `feat/source-verified-policies`)
+
+### 확인된 사실 (실제 실행 결과)
+- `pytest -q`: 57 passed.
+- `ruff check src tests scripts`: 통과.
+- `mypy src`: 28개 소스 파일 통과.
+- 기존 SQLite 스키마에서 보험·특약 출처 컬럼을 추가하고 기존 레코드를 `USER_STATED`로 취급하는 migration 테스트를 추가함.
+- MCP 문서 요청 안내 도구가 공식 보험사 발급 경로만 반환하는지와 제3자 앱·캡처·스크래핑 안내 문구가 없는지 테스트함.
+- 운영 데이터베이스에는 migration이나 기타 변경을 실행하지 않음.
+
+### 구현 내용
+- 정책·특약 출처 메타데이터를 저장하고 보험증권(`POLICY_CERTIFICATE`) 근거가 있는 담보만 예상 보험금 계산에 포함함.
+- 증권이 없을 때 보험사 공식 경로로 서류를 요청할 수 있도록 문서 안내 도구와 합성 샘플 데이터를 추가함.
+- `register_policy`에서 정책의 출처 메타데이터가 저장용 객체까지 전달되도록 수정함.
+
 ## 사용자 확보 대기 항목
 - 4세대 실손 표준약관 또는 가입 상품 약관 (약관 수치 `verified` 확정용).
 - GCP 프로젝트 결정 (Phase 6 전).

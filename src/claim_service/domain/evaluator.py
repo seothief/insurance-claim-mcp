@@ -35,8 +35,13 @@ def evaluate_claim(
 ) -> ClaimEvaluation:
     outcomes: list[Outcome] = []
     pending: list[str] = []
+    unverified: list[str] = []
     for policy in policies:
         if policy.policy_type == "SILSON":
+            if not policy.is_source_verified:
+                # Strict rule: the generation and deductibles come only from a policy certificate.
+                unverified.append(f"{policy.company} / {policy.product_name}")
+                continue
             silson = _evaluate_silson(policy, rules, claim)
             if silson is not None:
                 outcomes.append(silson)
@@ -44,6 +49,12 @@ def evaluate_claim(
         for rider in policy.riders:
             if rider.mapping_status == "NEEDS_CLARIFICATION":
                 pending.append(f"{policy.company} / {rider.rider_name}")
+                continue
+            if not policy.is_source_verified or (
+                not rider.is_source_verified and rider.mapping_status != "IGNORED"
+            ):
+                # Strict rule: a rider without a policy-certificate source is never calculated.
+                unverified.append(f"{policy.company} / {rider.rider_name}")
                 continue
             outcome = _evaluate_rider(policy, rider, rules, claim)
             if outcome is not None:
@@ -66,6 +77,7 @@ def evaluate_claim(
         total_estimated_payout=total,
         required_documents=documents,
         pending_riders=pending,
+        unverified_source_riders=unverified,
         disclaimer=DISCLAIMER,
     )
 

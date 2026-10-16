@@ -7,25 +7,34 @@ from claim_service.service import PolicyService
 
 SAMPLE_USER_ID = "user_123"
 
+# Synthetic sample data. It is not a real policy, so it is marked SYNTHETIC_SAMPLE and is never
+# calculated (only a POLICY_CERTIFICATE source may be calculated).
 SAMPLE_POLICIES: tuple[PolicyIn, ...] = (
     PolicyIn(
-        company="삼성화재",
-        product_name="무배당 삼성화재 다이렉트 착한실손의료비보장보험(4세대)",
+        company="샘플보험사A",
+        product_name="샘플 실손의료비보험(4세대)",
         policy_type="SILSON",
         silson_generation=4,
         enrolled_year=2023,
+        source_type="SYNTHETIC_SAMPLE",
     ),
     PolicyIn(
-        company="현대해상",
-        product_name="무배당 퍼펙트플러스종합보험",
+        company="샘플보험사B",
+        product_name="샘플 종합보험",
         policy_type="COMPREHENSIVE",
         enrolled_year=2021,
+        source_type="SYNTHETIC_SAMPLE",
         riders=[
-            RiderIn(rider_name="골절진단비(치아파열제외)", coverage_amount=300000),
-            RiderIn(rider_name="깁스치료비", coverage_amount=500000),
-            RiderIn(rider_name="질병수술비", coverage_amount=500000),
-            RiderIn(rider_name="상해수술비", coverage_amount=1000000),
-            RiderIn(rider_name="독감(인플루엔자)치료비", coverage_amount=200000),
+            RiderIn(
+                rider_name="골절진단비(샘플)",
+                coverage_amount=300000,
+                source_type="SYNTHETIC_SAMPLE",
+            ),
+            RiderIn(
+                rider_name="깁스치료비(샘플)",
+                coverage_amount=500000,
+                source_type="SYNTHETIC_SAMPLE",
+            ),
         ],
     ),
 )

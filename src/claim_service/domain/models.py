@@ -56,9 +56,22 @@ class UserProfile(BaseModel):
     next_step: str
 
 
+SourceType = Literal["POLICY_CERTIFICATE", "USER_STATED", "SYNTHETIC_SAMPLE"]
+SOURCE_LABELS: dict[str, str] = {
+    "POLICY_CERTIFICATE": "보험증권 근거 (사용자가 증권이라고 제출)",
+    "USER_STATED": "사용자 진술 (증권 근거 없음 — 계산하지 않음)",
+    "SYNTHETIC_SAMPLE": "합성 샘플 (실제 보험 아님 — 계산하지 않음)",
+}
+
+
 class RiderIn(BaseModel):
+    """A rider as read from a document. Only POLICY_CERTIFICATE may be used for calculation."""
+
     rider_name: str = Field(min_length=1, max_length=200)
     coverage_amount: int = Field(ge=0)
+    source_type: SourceType = "USER_STATED"
+    issuer: str | None = Field(default=None, max_length=100)
+    issued_on: str | None = Field(default=None, max_length=10, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 
 class PolicyIn(BaseModel):
@@ -69,6 +82,10 @@ class PolicyIn(BaseModel):
     enrolled_year: int | None = Field(default=None, ge=1980, le=2100)
     riders: list[RiderIn] = Field(default_factory=list)
     replace_riders: bool = False
+    # Source of the policy-level facts (product, generation). Calculated only when certified.
+    source_type: SourceType = "USER_STATED"
+    issuer: str | None = Field(default=None, max_length=100)
+    issued_on: str | None = Field(default=None, max_length=10, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
 
 class RiderOut(BaseModel):
@@ -78,6 +95,14 @@ class RiderOut(BaseModel):
     mapped_rule_id: str | None = None
     mapping_status: MappingStatus = "MAPPED"
     custom_rule_config: dict[str, Any] | None = None
+    source_type: SourceType = "USER_STATED"
+    issuer: str | None = None
+    issued_on: str | None = None
+
+    @property
+    def is_source_verified(self) -> bool:
+        """Only a policy certificate may be used for calculation (strict rule)."""
+        return self.source_type == "POLICY_CERTIFICATE"
 
 
 class PolicyOut(BaseModel):
@@ -88,6 +113,13 @@ class PolicyOut(BaseModel):
     silson_generation: int | None = None
     enrolled_year: int | None = None
     riders: list[RiderOut] = Field(default_factory=list)
+    source_type: SourceType = "USER_STATED"
+    issuer: str | None = None
+    issued_on: str | None = None
+
+    @property
+    def is_source_verified(self) -> bool:
+        return self.source_type == "POLICY_CERTIFICATE"
 
 
 class PolicyRegistration(BaseModel):
@@ -142,4 +174,6 @@ class ClaimEvaluation(BaseModel):
     total_estimated_payout: int
     required_documents: list[str]
     pending_riders: list[str] = Field(default_factory=list)
+    # Riders that exist but have no policy-certificate source. They are never calculated.
+    unverified_source_riders: list[str] = Field(default_factory=list)
     disclaimer: str
