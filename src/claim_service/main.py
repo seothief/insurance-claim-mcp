@@ -10,12 +10,13 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastmcp.utilities.lifespan import combine_lifespans
 
 from claim_service.api.auth import ApiKeyMiddleware
 from claim_service.api.routes import router as api_router
 from claim_service.config import get_settings
+from claim_service.intro import build_html, build_markdown
 from claim_service.mcp.server import mcp
 from claim_service.runtime import init_runtime
 
@@ -50,6 +51,18 @@ def create_app(database_url: str | None = None) -> FastAPI:
     @app.get("/api/version", include_in_schema=False)
     def version() -> JSONResponse:
         return JSONResponse({"service": "insurance-claim-mcp", "version": APP_VERSION})
+
+    @app.get("/", include_in_schema=False, response_class=HTMLResponse)
+    def intro_page() -> HTMLResponse:
+        return HTMLResponse(build_html())
+
+    @app.get("/about.md", include_in_schema=False, response_class=PlainTextResponse)
+    def intro_markdown() -> PlainTextResponse:
+        return PlainTextResponse(build_markdown(), media_type="text/markdown; charset=utf-8")
+
+    @app.get("/llms.txt", include_in_schema=False, response_class=PlainTextResponse)
+    def intro_llms() -> PlainTextResponse:
+        return PlainTextResponse(build_markdown(), media_type="text/plain; charset=utf-8")
 
     app.include_router(api_router)
     app.mount(MCP_PATH, mcp_app)
