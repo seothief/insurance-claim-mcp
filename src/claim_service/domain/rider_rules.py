@@ -21,6 +21,38 @@ def evaluate_rider(
     amount = rider.coverage_amount
     rule_id = rule.rule_id
 
+    missing_fact: str | None = None
+    if rule_id in {"FRACTURE_DIAGNOSIS", "BURN_DIAGNOSIS"} and not kcd:
+        missing_fact = "진단 KCD 코드"
+    elif rule_id == "CAST_TREATMENT" and not treatment_text:
+        missing_fact = "깁스 처치명 또는 처치 코드"
+    elif rule_id == "FLU_ANTIVIRAL" and not kcd and not claim.prescribed_drugs:
+        missing_fact = "진단 KCD 코드 또는 처방 약품명"
+    elif rule_id in {"DISEASE_SURGERY", "WOUND_SUTURE"} and not treatment:
+        missing_fact = "처치명"
+    elif rule_id == "INJURY_SURGERY":
+        if claim.is_injury is None:
+            missing_fact = "상해 여부"
+        elif not treatment:
+            missing_fact = "수술명 또는 처치명"
+    elif rule_id == "INPATIENT_DAILY":
+        if claim.is_inpatient is None:
+            missing_fact = "입원 여부"
+        elif claim.is_inpatient and claim.inpatient_days is None:
+            missing_fact = "입원 일수"
+    elif rule_id == "EMERGENCY_ROOM_VISIT" and claim.is_emergency is None:
+        missing_fact = "응급실 내원 및 응급 여부"
+
+    if missing_fact:
+        return make_outcome(
+            policy,
+            name,
+            rule_id,
+            "NOT_EVALUATED",
+            0,
+            f"{missing_fact}가 확인되지 않아 계산하지 않았습니다.",
+        )
+
     if rule_id == "FRACTURE_DIAGNOSIS":
         if any(kcd.startswith(ex) for ex in cfg["exclusion_kcd"]):
             return make_outcome(
@@ -93,7 +125,7 @@ def evaluate_rider(
         return None
 
     if rule_id == "INPATIENT_DAILY":
-        if claim.is_inpatient and claim.inpatient_days >= 1:
+        if claim.is_inpatient and claim.inpatient_days is not None and claim.inpatient_days >= 1:
             days = claim.inpatient_days
             return make_outcome(
                 policy, name, rule_id, "ELIGIBLE", amount * days,

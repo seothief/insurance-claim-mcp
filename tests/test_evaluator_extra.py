@@ -5,7 +5,7 @@ from claim_service.domain.evaluator import evaluate_claim
 from claim_service.domain.models import ClaimInput, PolicyOut, RiderOut
 from claim_service.domain.silson import resolve_silson_generation
 
-RULES = {rule.rule_id: rule for rule in STANDARD_RULES}
+RULES = {rule.rule_id: rule.model_copy(update={"verified": True}) for rule in STANDARD_RULES}
 
 
 def _rider(
@@ -69,14 +69,15 @@ def test_burn_emergency_and_inpatient_daily() -> None:
     assert amounts == {"화상진단비": 100000, "응급실내원비": 50000, "입원일당": 90000}
 
 
-def test_custom_rider_uses_confirmed_conditions() -> None:
+def test_custom_rider_is_not_evaluated_without_policy_verification() -> None:
     custom = _rider(
         "무배당 뉴플랜수술담보", 1000000, None, status="CUSTOM",
         custom={"target_keywords": ["수술"]},
     )
     result = evaluate_claim("u", [_comprehensive(custom)], RULES, ClaimInput(treatment_name="수술"))
-    assert result.total_estimated_payout == 1000000
-    assert "검증되지 않았습니다" in result.matched_benefits[0].basis
+    assert result.total_estimated_payout == 0
+    assert result.matched_benefits[0].status == "NOT_EVALUATED"
+    assert "검증되지 않아" in result.matched_benefits[0].basis
 
 
 def test_needs_clarification_rider_is_pending_not_paid() -> None:
@@ -103,3 +104,11 @@ def test_injury_surgery_requires_injury_flag() -> None:
         "u", [policy], RULES, ClaimInput(treatment_name="수술", is_injury=True)
     )
     assert injured.total_estimated_payout == 1000000
+
+
+def test_inpatient_daily_missing_facts_is_not_evaluated() -> None:
+    policy = _comprehensive(_rider("입원일당", 30000, "INPATIENT_DAILY"))
+    for claim in (ClaimInput(), ClaimInput(is_inpatient=True)):
+        result = evaluate_claim("u", [policy], RULES, claim)
+        assert result.matched_benefits[0].status == "NOT_EVALUATED"
+        assert result.total_estimated_payout == 0

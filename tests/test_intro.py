@@ -93,7 +93,9 @@ def test_example_is_computed_by_the_engine_and_shows_the_cast_difference() -> No
     assert "통깁스(석고붕대) 처치" in markdown
     assert "부목(반깁스) 처치" in markdown
     amounts = re.findall(r"합계 예상: ([\d,]+)원", markdown)
-    assert amounts == ["800,000", "300,000"]
+    assert amounts == ["0", "0"]
+    assert "NOT_EVALUATED" in markdown
+    assert "약관 원문으로 검증되지 않아 계산하지 않았습니다" in markdown
 
 
 def test_html_has_preview_tags_and_escapes_markup() -> None:

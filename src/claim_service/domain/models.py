@@ -152,11 +152,12 @@ class ClaimInput(BaseModel):
     treatment_code: str | None = None
     cost_covered: int = Field(default=0, ge=0)
     cost_uncovered: int = Field(default=0, ge=0)
-    hospital_type: HospitalType = "clinic"
-    is_inpatient: bool = False
-    inpatient_days: int = Field(default=0, ge=0)
-    is_injury: bool = False
-    is_emergency: bool = False
+    hospital_type: HospitalType | None = None
+    # None means the receipt/prescription did not establish this fact.
+    is_inpatient: bool | None = None
+    inpatient_days: int | None = Field(default=None, ge=0)
+    is_injury: bool | None = None
+    is_emergency: bool | None = None
     prescribed_drugs: list[str] = Field(default_factory=list)
 
 

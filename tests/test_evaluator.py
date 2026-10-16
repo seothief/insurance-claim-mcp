@@ -4,7 +4,8 @@ from claim_service.domain.catalog import STANDARD_RULES, candidate_rule_ids, mat
 from claim_service.domain.evaluator import evaluate_claim
 from claim_service.domain.models import ClaimInput, PolicyOut, RiderOut
 
-RULES = {rule.rule_id: rule for rule in STANDARD_RULES}
+RULES = {rule.rule_id: rule.model_copy(update={"verified": True}) for rule in STANDARD_RULES}
+UNVERIFIED_RULES = {rule.rule_id: rule for rule in STANDARD_RULES}
 
 
 def _rider(
@@ -62,7 +63,12 @@ def test_candidate_rules_suggest_similar_riders() -> None:
 
 
 def test_silson_outpatient_clinic_deductions() -> None:
-    claim = ClaimInput(cost_covered=25000, cost_uncovered=60000, hospital_type="clinic")
+    claim = ClaimInput(
+        cost_covered=25000,
+        cost_uncovered=60000,
+        hospital_type="clinic",
+        is_inpatient=False,
+    )
     result = evaluate_claim("u", [_silson()], RULES, claim)
     benefit = result.matched_benefits[0]
     # covered: max(10000, 25000*0.2=5000)=10000 deducted -> 15000
@@ -76,6 +82,18 @@ def test_silson_inpatient_ratio() -> None:
     claim = ClaimInput(cost_covered=100000, cost_uncovered=100000, is_inpatient=True)
     result = evaluate_claim("u", [_silson()], RULES, claim)
     assert result.matched_benefits[0].estimated_amount == 80000 + 70000
+
+
+def test_silson_missing_visit_type_or_hospital_type_is_not_evaluated() -> None:
+    policy = _silson()
+    missing_visit_type = evaluate_claim(
+        "u", [policy], RULES, ClaimInput(cost_covered=10000)
+    )
+    assert missing_visit_type.matched_benefits[0].status == "NOT_EVALUATED"
+    missing_hospital_type = evaluate_claim(
+        "u", [policy], RULES, ClaimInput(cost_covered=10000, is_inpatient=False)
+    )
+    assert missing_hospital_type.matched_benefits[0].status == "NOT_EVALUATED"
 
 
 def test_silson_without_generation_is_not_evaluated() -> None:
@@ -99,6 +117,21 @@ def test_fracture_eligible_and_excluded() -> None:
     excluded = evaluate_claim("u", [policy], RULES, ClaimInput(kcd_code="S02.5"))
     assert excluded.matched_benefits[0].status == "EXCLUDED"
     assert excluded.total_estimated_payout == 0
+
+
+def test_unverified_standard_rule_is_not_evaluated() -> None:
+    policy = _comprehensive(_rider("골절진단비", 300000, "FRACTURE_DIAGNOSIS"))
+    result = evaluate_claim("u", [policy], UNVERIFIED_RULES, ClaimInput(kcd_code="S82.1"))
+    assert result.matched_benefits[0].status == "NOT_EVALUATED"
+    assert result.matched_benefits[0].estimated_amount == 0
+    assert result.total_estimated_payout == 0
+
+
+def test_missing_diagnosis_fact_is_not_evaluated() -> None:
+    policy = _comprehensive(_rider("골절진단비", 300000, "FRACTURE_DIAGNOSIS"))
+    result = evaluate_claim("u", [policy], RULES, ClaimInput())
+    assert result.matched_benefits[0].status == "NOT_EVALUATED"
+    assert "KCD 코드" in result.matched_benefits[0].basis
 
 
 def test_splint_is_excluded_from_cast_benefit() -> None:

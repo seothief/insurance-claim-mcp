@@ -6,7 +6,6 @@ No I/O happens here. Results are informational estimates, not payment decisions.
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from claim_service.domain.custom_rules import evaluate_custom_rider
 from claim_service.domain.models import (
     ClaimEvaluation,
     ClaimInput,
@@ -18,8 +17,8 @@ from claim_service.domain.outcome import Outcome, make_outcome
 from claim_service.domain.rider_rules import evaluate_rider
 
 DISCLAIMER = (
-    "본 분석 결과는 가입 약관 기준의 사전 예측치이며, "
-    "실제 최종 지급액은 보험사 손해사정 심사에 따라 달라질 수 있습니다."
+    "본 결과는 참고 정보이며 보험금 지급을 확정하지 않습니다. "
+    "약관 원문으로 검증되지 않은 규칙이나 확인되지 않은 진료 사실은 계산하지 않았습니다."
 )
 BASE_DOCUMENTS: tuple[str, ...] = (
     "진료비 계산서·영수증 (병원 원무과 발급)",
@@ -91,10 +90,27 @@ def _evaluate_rider(
     if rider.mapping_status == "IGNORED":
         return None
     if rider.mapping_status == "CUSTOM":
-        return evaluate_custom_rider(policy, rider, claim)
+        return make_outcome(
+            policy,
+            rider.rider_name,
+            None,
+            "NOT_EVALUATED",
+            0,
+            "커스텀 조건이 약관 원문으로 검증되지 않아 계산하지 않았습니다.",
+        )
     if rider.mapped_rule_id is None or rider.mapped_rule_id not in rules:
         return None
-    return evaluate_rider(rules[rider.mapped_rule_id], policy, rider, claim)
+    rule = rules[rider.mapped_rule_id]
+    if not rule.verified:
+        return make_outcome(
+            policy,
+            rider.rider_name,
+            rule.rule_id,
+            "NOT_EVALUATED",
+            0,
+            f"'{rule.display_name}' 규칙이 약관 원문으로 검증되지 않아 계산하지 않았습니다.",
+        )
+    return evaluate_rider(rule, policy, rider, claim)
 
 
 def _evaluate_silson(
@@ -104,7 +120,11 @@ def _evaluate_silson(
     if total_cost <= 0:
         return None
 
-    label = "입원" if claim.is_inpatient else "통원"
+    label = (
+        "입원" if claim.is_inpatient is True
+        else "통원" if claim.is_inpatient is False
+        else "진료 유형 미확인"
+    )
     name = f"{policy.product_name}({label})"
     if policy.silson_generation is None:
         return make_outcome(
@@ -113,11 +133,21 @@ def _evaluate_silson(
         )
     rule_id = f"SILSON_GEN{policy.silson_generation}"
     rule = rules.get(rule_id)
-    if rule is None or not rule.rule_config:
+    if rule is None or not rule.verified or not rule.rule_config:
         return make_outcome(
             policy, name, rule_id, "NOT_EVALUATED", 0,
-            f"{policy.silson_generation}세대 실손 약관 수치가 아직 입력되지 않아 "
-            "계산하지 않았습니다 (약관 원문 확보 후 검증 대기).",
+            f"{policy.silson_generation}세대 실손 규칙의 약관 검증 또는 수치 입력이 완료되지 않아 "
+            "계산하지 않았습니다.",
+        )
+
+    if claim.is_inpatient is None:
+        return make_outcome(
+            policy,
+            name,
+            rule_id,
+            "NOT_EVALUATED",
+            0,
+            "입원/통원 여부가 확인되지 않아 실손 계산을 보류했습니다.",
         )
 
     cfg: dict[str, Any] = rule.rule_config
@@ -131,6 +161,15 @@ def _evaluate_silson(
             f"비급여 {uncovered_ratio:.0%} 보장 기준 적용 (약관 대조 전 예상치)"
         )
     else:
+        if claim.hospital_type is None:
+            return make_outcome(
+                policy,
+                name,
+                rule_id,
+                "NOT_EVALUATED",
+                0,
+                "통원 의료기관 유형이 확인되지 않아 실손 계산을 보류했습니다.",
+            )
         min_deductible = int(cfg["outpatient_deductible"][claim.hospital_type])
         covered_deductible = max(
             min_deductible,

@@ -159,7 +159,8 @@ def test_certified_policy_is_calculated(client: TestClient) -> None:
         "/api/users/me/evaluate",
         json={"kcd_code": "S82.1", "treatment_name": "골절", "cost_covered": 1000},
     ).json()
-    assert result["total_estimated_payout"] == 300000
+    assert result["total_estimated_payout"] == 0
+    assert result["matched_benefits"][0]["status"] == "NOT_EVALUATED"
     assert result["unverified_source_riders"] == []
 
 
