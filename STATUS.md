@@ -193,6 +193,39 @@
 - 실제 Cline MCP 도구 호출(`insurance-claim__get_onboarding_guide`)이 Cloud Run 원격 서버에서 오류 없이 즉시 성공함을 확인함.
 - 로컬 Antigravity(`~/.gemini/config/mcp_config.json`) 등 stdio 클라이언트에서 단독 실행할 수 있도록 `claim_service.mcp.server`에 `main()`(`init_runtime()` + `mcp.run()`) 진입점과 `get_service()` 지연 초기화를 추가함 (`pytest` 44 passed).
 
+## Phase 1-G. AI가 읽는 공개 소개 페이지 — `main` 병합 및 Cloud Run 배포 완료
+
+### 확인된 사실 (실제 실행 결과)
+- 공개 경로 3개 추가: `/`(HTML), `/about.md`, `/llms.txt`. 한 곳(`src/claim_service/intro.py`)에서 만든
+  같은 내용이며, 예시 계산은 실제 평가 엔진을 합성 데이터로 실행한 결과다.
+- `api/auth.py`의 `PUBLIC_PATHS`에 세 경로를 추가해 `API_KEY`가 있어도 키 없이 열린다.
+- 로컬 검증: `pytest -q` **53 passed**(소개 페이지 테스트 9개 포함), `ruff` 통과, `mypy src` 통과(27개 파일).
+- `main`에 fast-forward 병합(`c3516cc`). 병합 전 `main`은 Phase 0 상태(`4deca89`)였다.
+- 이미지 `app:v5` 빌드(Cloud Build `SUCCESS`) 후 Cloud Run 리비전 `insurance-claim-mcp-00005-5l7`로 배포,
+  트래픽 100%. **롤백 지점은 직전 리비전 `insurance-claim-mcp-00004-2vr`(`app:v4`).**
+- 운영 서비스 확인(키 없이 요청): `/`, `/about.md`, `/llms.txt`, `/api/health` 200. `/api/catalog/rules`,
+  `/api/users/user_123/policies`, `POST /mcp`는 401.
+- `fetch_web_content`로 실제 주소의 `/`를 읽어, 한 줄 요약·계산 예시·한계 6개·설계사 질문 3개가 그대로 읽히는 것을 확인했다.
+- 소개 페이지에는 API 키, GCP 프로젝트 ID, 서비스 주소, DB 정보가 없다(테스트로 검증).
+
+### 설계 제안 (미검증)
+- 설계사 등 외부인에게 링크 하나(`/`)만 전달하고, 받은 사람이 자신의 AI에게 설명을 요청하는 용도.
+- AI가 링크를 열지 못하면 `/about.md`를 복사해 붙여 넣는다.
+
+### 확인하지 못한 것
+- 외부 AI(ChatGPT, Gemini 등)가 이 링크를 열 수 있는지, `llms.txt`를 자동으로 읽는지.
+- 카카오톡 링크 미리보기 카드가 표시되는지(`og:title`, `og:description`은 넣음).
+- `main` 푸시로 GitHub Actions CI가 실행됐는지와 그 결과. `deploy-cloudrun.yml`은 Workload Identity가
+  설정되지 않아 동작하지 않는 것으로 알고 있으나 확인하지 않았다.
+
+### 병행 작업
+- `feat/contract-list-import` 브랜치(`324e475`): 보험협회 계약 목록 PDF를 로컬에서 읽어 유효·청구 대상 계약만 고르는
+  스크립트. 실제 PDF 드라이런에서 19건 중 등록 6건, 제외 13건. `main`에는 아직 병합하지 않았다.
+  알려진 문제: 인쇄물이 긴 상품명을 잘라 출력해 상품명이 `…파트너(1`처럼 끊긴다.
+- 내보험찾아줌 결과(`생명보험협회.pdf`)와 삼성화재 계약사항 PDF에는 특약별 가입금액이 없다. 특약 정보는
+  보험증권이나 설계사의 보장분석 리포트가 필요하다.
+
 ## 사용자 확보 대기 항목
 - 4세대 실손 표준약관 또는 가입 상품 약관 (약관 수치 `verified` 확정용).
+- 특약·가입금액이 담긴 문서(보험증권 또는 보장분석 리포트) 샘플.
 - GCP 프로젝트 결정 (Phase 6 전).
