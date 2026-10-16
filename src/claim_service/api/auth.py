@@ -13,7 +13,16 @@ from claim_service.domain.security import set_request_identity
 # /openapi.json describes the API shape only (no user data). ChatGPT Actions must fetch it
 # without credentials when a GPT is configured. The intro pages are static, secret-free text.
 PUBLIC_PATHS = frozenset(
-    {"/api/health", "/api/version", "/openapi.json", "/", "/llms.txt", "/about.md"}
+    {
+        "/api/health",
+        "/api/version",
+        "/openapi.json",
+        "/",
+        "/llms.txt",
+        "/about.md",
+        "/start",
+        "/start.md",
+    }
 )
 Scope = MutableMapping[str, Any]
 Message = MutableMapping[str, Any]

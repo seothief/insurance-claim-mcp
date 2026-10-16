@@ -19,6 +19,7 @@ from claim_service.config import get_settings
 from claim_service.intro import build_html, build_markdown
 from claim_service.mcp.server import mcp
 from claim_service.runtime import init_runtime
+from claim_service.start_guide import build_start_html, build_start_markdown
 
 APP_VERSION = os.environ.get("APP_VERSION", "local")
 MCP_PATH = "/mcp"
@@ -54,15 +55,29 @@ def create_app(database_url: str | None = None) -> FastAPI:
 
     @app.get("/", include_in_schema=False, response_class=HTMLResponse)
     def intro_page() -> HTMLResponse:
-        return HTMLResponse(build_html())
+        return HTMLResponse(build_html(base_url))
 
     @app.get("/about.md", include_in_schema=False, response_class=PlainTextResponse)
     def intro_markdown() -> PlainTextResponse:
-        return PlainTextResponse(build_markdown(), media_type="text/markdown; charset=utf-8")
+        return PlainTextResponse(
+            build_markdown(base_url), media_type="text/markdown; charset=utf-8"
+        )
 
     @app.get("/llms.txt", include_in_schema=False, response_class=PlainTextResponse)
     def intro_llms() -> PlainTextResponse:
-        return PlainTextResponse(build_markdown(), media_type="text/plain; charset=utf-8")
+        return PlainTextResponse(
+            build_markdown(base_url), media_type="text/plain; charset=utf-8"
+        )
+
+    @app.get("/start", include_in_schema=False, response_class=HTMLResponse)
+    def start_page() -> HTMLResponse:
+        return HTMLResponse(build_start_html(base_url))
+
+    @app.get("/start.md", include_in_schema=False, response_class=PlainTextResponse)
+    def start_markdown() -> PlainTextResponse:
+        return PlainTextResponse(
+            build_start_markdown(base_url), media_type="text/markdown; charset=utf-8"
+        )
 
     app.include_router(api_router)
     app.mount(MCP_PATH, mcp_app)

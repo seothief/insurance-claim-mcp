@@ -49,6 +49,23 @@ def test_intro_routes_are_public_even_when_a_key_is_required(keyed_client: TestC
     assert keyed_client.get("/about.md").status_code == 200
 
 
+def test_start_routes_are_public_and_do_not_publish_the_api_key(
+    keyed_client: TestClient,
+) -> None:
+    page = keyed_client.get("/start")
+    markdown = keyed_client.get("/start.md")
+    assert page.status_code == markdown.status_code == 200
+    assert page.headers["content-type"].startswith("text/html")
+    assert "text/markdown" in markdown.headers["content-type"]
+    assert "X-API-Key" in markdown.text
+    assert "secret-test-key-1234567890" not in page.text + markdown.text
+    assert keyed_client.get("/start").text.find("/start.md") >= 0
+
+
+def test_home_page_links_to_start_guide(keyed_client: TestClient) -> None:
+    assert 'href="/start"' in keyed_client.get("/").text
+
+
 def test_data_routes_still_require_the_key(keyed_client: TestClient) -> None:
     assert keyed_client.get("/api/catalog/rules").status_code == 401
     assert keyed_client.get("/api/users/user_123/policies").status_code == 401

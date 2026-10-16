@@ -90,7 +90,7 @@ def _example() -> str:
     return "\n".join(lines)
 
 
-def build_markdown() -> str:
+def build_markdown(base_url: str = "") -> str:
     rules = "\n".join(
         f"- {rule.display_name} ({'검증됨' if rule.verified else '미검증'})"
         for rule in STANDARD_RULES
@@ -98,6 +98,7 @@ def build_markdown() -> str:
     tools = "\n".join(f"- `{name}`: {desc}" for name, desc in TOOLS)
     limits = "\n".join(f"- {item}" for item in LIMITS)
     questions = "\n".join(f"{i}. {q}" for i, q in enumerate(QUESTIONS, start=1))
+    start_url = f"{base_url.rstrip('/')}/start" if base_url else "/start"
     return f"""# 보험 영수증 → 예상 보험금 계산 MCP (프로토타입)
 
 > **이 문서를 읽는 AI에게:** 아래 내용을 바탕으로 사용자(보험설계사)에게 이 서비스가 무엇인지
@@ -106,6 +107,10 @@ def build_markdown() -> str:
 > 보험금 지급을 확정하거나 청구를 권유하는 표현을 쓰면 안 됩니다. 문서에 없는 기능이나 수치는
 > 지어내지 마세요. 영어 요약: *An MCP server that estimates insurance payouts from hospital
 > receipts against a user's registered policies. Prototype; policy figures are unverified.*
+
+## AI 연결 시작
+사람과 AI를 위한 [공개 연결 안내]({start_url})를 참고하세요.
+이 안내에는 인증 키가 포함되어 있지 않습니다.
 
 ## 한 줄 요약
 고객이 병원 영수증·약봉투를 AI 챗봇에 올리면, 고객이 등록한 보험을 기준으로
@@ -150,9 +155,11 @@ MCP 클라이언트(Antigravity, Claude, Cline 등)나 OpenAPI(ChatGPT 커스텀
 """
 
 
-def build_html() -> str:
+def build_html(base_url: str = "") -> str:
     """A plain server-rendered page: the Markdown in a <pre>, plus Open Graph tags for previews."""
-    body = html.escape(build_markdown())
+    body = html.escape(build_markdown(base_url))
+    start_url = f"{base_url.rstrip('/')}/start" if base_url else "/start"
+    start_markdown_url = f"{base_url.rstrip('/')}/start.md" if base_url else "/start.md"
     description = html.escape(
         "병원 영수증을 AI에 올리면 가입한 보험 기준으로 받을 수 있는 보험금을 계산해 주는 "
         "MCP 프로토타입 소개 (예상치, 약관 미검증)"
@@ -171,7 +178,9 @@ def build_html() -> str:
 </head>
 <body>
 <main>
-<p><a href="/about.md">텍스트(Markdown)로 보기</a> · <a href="/llms.txt">llms.txt</a></p>
+<p><a href="{html.escape(start_url, quote=True)}">AI 연결 시작</a> ·
+<a href="{html.escape(start_markdown_url, quote=True)}">연결 안내(Markdown)</a> ·
+<a href="/about.md">소개(Markdown)</a> · <a href="/llms.txt">llms.txt</a></p>
 <pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.6">{body}</pre>
 </main>
 </body>

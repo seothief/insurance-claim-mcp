@@ -53,6 +53,20 @@ def test_openapi_lists_servers_when_public_url_is_set(
     get_settings.cache_clear()
 
 
+def test_start_guide_uses_public_base_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fresh_external_schema: None
+) -> None:
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://example.test/")
+    get_settings.cache_clear()
+    with TestClient(create_app(database_url_for(tmp_path, "start-url.db"))) as client:
+        assert "https://example.test/mcp" in client.get("/start.md").text
+        assert "https://example.test/openapi.json" in client.get("/start.md").text
+        assert "https://example.test/start" in client.get("/").text
+        assert "https://example.test/start" in client.get("/llms.txt").text
+    monkeypatch.delenv("PUBLIC_BASE_URL")
+    get_settings.cache_clear()
+
+
 def test_api_rejects_missing_or_wrong_key(keyed_client: TestClient) -> None:
     assert keyed_client.get("/api/catalog/rules").status_code == 401
     wrong = keyed_client.get("/api/catalog/rules", headers={"X-API-Key": "nope"})
