@@ -1,9 +1,10 @@
 name: Deploy to Cloud Run
 
-# Runs only after CI passes on main, or manually. Requires repository variables and secrets:
+# Automatically deploys main after CI passes; workflow_dispatch also allows one-click deploys.
+# Manual runs are restricted to main. Requires repository variables and secrets:
 #   vars.GCP_PROJECT_ID, vars.GCP_REGION, vars.GAR_REPOSITORY (Artifact Registry repo name)
 #   secrets.GCP_WORKLOAD_IDENTITY_PROVIDER, secrets.GCP_SERVICE_ACCOUNT
-#   secrets.DATABASE_URL (PostgreSQL URL, e.g. Cloud SQL), secrets.API_KEY
+# The Cloud Run service account must already have Secret Manager access for DATABASE_URL and API_KEY.
 on:
   workflow_dispatch:
   workflow_run:
@@ -17,14 +18,21 @@ permissions:
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     env:
       SERVICE: insurance-claim-mcp
       REGION: ${{ vars.GCP_REGION }}
-      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/insurance-claim-mcp:${{ github.sha }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GAR_REPOSITORY }}/insurance-claim-mcp:${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -32,6 +40,11 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
+      - name: Resolve Cloud Run URL
+        run: |
+          url=$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" --format 'value(status.url)')
+          test -n "$url"
+          echo "PUBLIC_BASE_URL=$url" >> "$GITHUB_ENV"
       - name: Build and push image
         run: |
           docker build -t "$IMAGE" .
@@ -41,12 +54,16 @@ jobs:
           gcloud run deploy "$SERVICE" \
             --image "$IMAGE" \
             --region "$REGION" \
-            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --project "$PROJECT_ID" \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "APP_VERSION=${{ github.sha }},SEED_SAMPLE_DATA=false" \
-            --set-secrets "DATABASE_URL=DATABASE_URL:latest,API_KEY=API_KEY:latest"
-      - name: Verify health endpoint
+            --update-env-vars "APP_VERSION=${IMAGE##*:},SEED_SAMPLE_DATA=false,PUBLIC_BASE_URL=$PUBLIC_BASE_URL" \
+            --update-secrets "DATABASE_URL=DATABASE_URL:latest,API_KEY=API_KEY:latest"
+      - name: Verify deployment
         run: |
-          url=$(gcloud run services describe "$SERVICE" --region "$REGION" --project "${{ vars.GCP_PROJECT_ID }}" --format 'value(status.url)')
-          curl -fsS "$url/api/health"
+          set -euo pipefail
+          curl --retry 12 --retry-delay 5 --retry-connrefused -fsS "$PUBLIC_BASE_URL/api/health" | python3 -c 'import json,sys; assert json.load(sys.stdin)["status"] == "ok"'
+          curl -fsS "$PUBLIC_BASE_URL/api/version" | python3 -c 'import json,sys,os; assert json.load(sys.stdin)["version"] == os.environ["EXPECTED_VERSION"]'
+          curl -fsS "$PUBLIC_BASE_URL/llms.txt" > /dev/null
+        env:
+          EXPECTED_VERSION: ${{ github.event.workflow_run.head_sha || github.sha }}

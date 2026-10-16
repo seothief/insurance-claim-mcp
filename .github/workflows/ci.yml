@@ -21,7 +21,7 @@ jobs:
         run: |
           grep -viE '^(pywin32|pywin32-ctypes)' requirements.lock.txt > requirements.linux.txt
           pip install -r requirements.linux.txt
-      - run: ruff check src tests
+      - run: ruff check src tests scripts
       - run: mypy src
 
   test-sqlite:

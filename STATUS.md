@@ -1,15 +1,45 @@
 # 진행 현황
 
-최종 갱신: 2026-10-16
+최종 갱신: 2026-10-17
 
-## 최신 진행 상황 (2026-10-16)
+## 최신 진행 상황 (2026-10-17)
 
+- 유지보수 개선(2026-10-17): 사용 이력이 확인된 Neon 스킬 파일은 유지. PoC `legacy/` 5개 파일 삭제. Cloud/Neon 운영 데이터는 변경하지 않음.
+- GCP Secret Manager 조회/DB URL 정규화를 `scripts/gcp_secrets.py`로 공통화하고 CI Ruff 검사에 `scripts/`를 포함. GitHub Actions `main` CI 성공 후 Cloud Run 자동 배포, main 수동 실행 및 `/api/health`, `/api/version`, `/llms.txt` 스모크 확인을 구성. `PUBLIC_BASE_URL` 누락도 배포 환경에서 보완함.
+- 배포 최초 설정 안내는 `docs/deployment.md`에 기록. GitHub Actions 변수/시크릿과 Workload Identity Federation은 이 로컬 환경에서 조회 권한을 확인하지 못했으며 설정 완료 여부는 미확인. 실제 운영 배포는 실행하지 않음.
+- 검증: 전체 `pytest -q` 72 passed, `ruff check src tests scripts` 통과, `mypy src` 29개 파일 통과, GitHub Actions YAML 파싱 및 `git diff --check` 통과. Docker/Cloud 배포는 실행하지 않음.
+
+- 사용자 결정(2026-10-17): 공용 `API_KEY` 인증을 유지하고 사용자 구분은 `X-User-Id`로 한다. 사용자별 API 키 기능은 다음 배포 후보 코드에서 제거하며, 현재 Cloud Run 배포는 변경하지 않는다. `X-User-Id`는 인증 수단이 아니므로 공용 키를 대체하지 않으며, 기존 PIN 보호도 유지한다.
+- 코드 변경: 사용자별 키 인증/DB 테이블/운영 CLI/운영 가이드를 제거하고 MCP 클라이언트 문서를 공용 `X-API-Key` + 사용자별 `X-User-Id` 설정으로 수정함. 기존 DB 테이블 및 키 데이터는 배포 때 자동 삭제하지 않음.
+
+- 사용자별 무만료 API/MCP 키 구현: 무작위 키 원문은 발급 시 한 번만 보여주고 DB에는 SHA-256 해시만 저장. `X-User-Key` 인증 시 서버가 사용자 ID를 바인딩하며 해당 계정 PIN 입력을 대체하고, 잘못된 사용자 키만으로는 공용 키가 설정된 서비스에 접근할 수 없음. 관리자 CLI 발급·목록·폐기와 사용자 키 운영/클라이언트 설정 문서를 추가함.
+- 검증: 전체 `pytest -q` 64 passed, 인증 통합 테스트 11 passed, Ruff 통과, mypy 29개 소스 파일 통과, `git diff --check` 통과. 운영 키 CLI의 임시 SQLite 확인에서 발급/목록/폐기는 성공했으며 첫 확인의 한국어 성공문구 비교는 PowerShell 출력 인코딩 차이로 실패했으나 키 ID가 폐기 후 목록에서 제거됨을 확인함.
+- 배포 전에는 운영 DB를 직접 조회·변경하지 않음. 브랜치 `feat/per-user-api-keys`; 기존 사용자 변경 파일은 그대로 보존.
+- 사용자별 무만료 키 기능을 Cloud Build `39e9c5f9-2636-445b-85bd-de48ce66408a`로 빌드하고, 이미지 `claim-service:user-api-keys-20261016`를 Cloud Run에 배포함. 리비전 `insurance-claim-mcp-00008-dlx` Ready 및 트래픽 100% 확인. `APP_VERSION`만 갱신하고 기존 `PUBLIC_BASE_URL`, `DATABASE_URL`/`API_KEY` Secret 참조, `SEED_SAMPLE_DATA=false`를 보존함.
+- 배포 후 앱 시작 시 `init_schema()`가 실행되어 누락된 테이블(사용자 API 키 테이블 포함)이 있으면 생성될 수 있음. 별도 운영 DB 쿼리나 사용자 데이터 변경은 하지 않음. 공개 URL에서 `/api/health`, `/api/version`, `/llms.txt` HTTP 200 및 버전 `user-api-keys-20261016` 확인. 인증이 필요한 `/api/catalog/rules`는 키 없이 HTTP 401을 반환함.
+- fail-closed 평가 변경과 합성 샘플 사용자 시드 기본 비활성화 변경을 각각 `fb16046`, `e11fecc`로 커밋. 시드 관련 배포/Compose/테스트 설정은 두 번째 커밋에 포함했고, 나머지 로컬 변경은 커밋에서 제외.
+- 검증: 사용자가 확인한 전체 테스트 62 passed (2.05s), Ruff 통과, mypy 28개 소스 파일 통과.
+- Cloud Build `459f0596-a3b6-42c4-9315-23e93fecece9` 성공. 이미지 `claim-service:e11fecc`를 Cloud Run `insurance-claim-mcp-00007-jpm`에 배포, Ready 상태 및 트래픽 100%를 확인. `APP_VERSION=e11fecc`, `SEED_SAMPLE_DATA=false`; 기존 `DATABASE_URL`, `API_KEY` Secret Manager 참조와 `PUBLIC_BASE_URL`은 보존.
+- 배포 후 `/api/health`, `/api/version`, `/llms.txt`는 HTTP 200, 버전은 `e11fecc`. MCP `list_standard_rules` 읽기 전용 호출은 클라이언트 상호운용 결과 미확인 상태이므로 Aside 측 스모크 테스트 필요.
+- Docker 데몬이 실행되지 않아 로컬 Docker 테스트는 하지 않았으며 Cloud Build에서 이미지 빌드 성공.
+- Aside 팀 전달: fail-closed 배포와 시드 비활성화 완료, 사용자/보험 데이터 변경 없음. Aside 운영자가 보호된 `X-API-Key` 설정을 통해 `list_standard_rules` 읽기 전용 테스트 후 규칙 개수 및 `verified` 상태 요약 회신 요청. 키/PIN/개인정보를 대화에 포함하지 말 것.
+
+- fail-closed 평가 보강: `ClaimInput`에서 입원/통원, 상해 여부, 응급 여부, 입원 일수, 통원 의료기관 유형의 미제공을 `None`으로 표현. 필수 진료 사실이 확인되지 않으면 결과를 `NOT_EVALUATED`로 반환하며 예상 지급액은 0원.
+- `verified: false`인 표준 특약 규칙과 약관 원문 검증이 없는 CUSTOM 특약은 더 이상 계산하지 않음. 실손도 규칙 미검증 또는 필수 진료 유형/기관 정보 부재 시 계산 보류. 지급 확정 표현 없이 검증 제한을 결과 disclaimer에 명시.
+- 약관 PDF/원문은 이번 작업에서 대조하지 않았고 어떤 규칙도 검증 처리하지 않음. 따라서 현재 비어 있는 약관 조건은 추정해 채우지 않음. API 입력 스키마에서 누락 사실을 허용하므로 클라이언트가 `NOT_EVALUATED` 응답을 처리하는지 별도 확인 필요.
+- 검증 결과: evaluator 단위 테스트 21 passed, API extra 통합 테스트 15 passed, Ruff 통과, mypy 28개 소스 파일 통과. 전체 `pytest -q` 실행 결과는 셸 출력에서 완료를 확인하지 못해 전체 스위트 통과로 기록하지 않음.
+- 개인 계정 ADC 방식 선택. Windows에서 gcloud CLI를 PATH에서 찾았으며, `CurrentUser` 실행 정책은 `Undefined`라 실행 정책 변경은 하지 않음. 후속 확인에서 ADC 파일 및 액세스 토큰 발급은 성공했으나 `gcloud auth list` 활성 계정 표시는 확인되지 않음.
+- 인증 점검 도구 `scripts/check_gcloud_auth.py`, ADC 토큰 자동 갱신 도우미 `scripts/gcloud_auth.py`, 제한된 읽기 전용 샘플 검토 도구 `scripts/review_sample_data.py`, 모니터 개선 및 `docs/gcloud-auth.md`를 추가함. 인증 정보·토큰·Secret 값은 출력하지 않도록 설계함.
+- 후속 확인에서 일반 gcloud CLI 활성 계정은 감지되지 않았지만 ADC 파일과 액세스 토큰 발급은 확인됨. 제한된 읽기 전용 검토 결과: coverage_rules 13, users 2, user_policies 5, user_policy_riders 16. `user_123` 존재 및 샘플 별칭 표식 일치, 보험 2건·특약 5건 연결. 단, 연결된 보험/특약 모두 `SYNTHETIC_SAMPLE` 출처 검증에 실패함. 이전 마이그레이션 또는 이후 수정 데이터일 가능성을 배제할 수 없어 삭제 금지 상태로 두며 어떤 운영 레코드도 변경하지 않음.
+- 로컬 작업 브랜치 `feat/disable-synthetic-seed`에서 합성 사용자 `user_123` 자동 시드를 기본 비활성화함. 표준 담보 규칙 시드는 계속 유지하고, Docker Compose 및 Cloud Run 배포 워크플로도 사용자 샘플 시드를 끄도록 변경함.
+- 검증: `pytest -q` 58 passed, `ruff check src tests scripts` 통과, `mypy src` 28개 파일 통과. 새 설정에서 샘플 사용자는 생성되지 않고 표준 규칙은 유지되는 테스트 포함.
+- ADC를 사용한 운영 DB 읽기 전용 검토를 완료함. `user_123`는 존재하고 별칭은 샘플 표식과 일치하나, 연결된 보험 2건과 특약 5건의 `source_type`은 `SYNTHETIC_SAMPLE`이 아님. 삭제 대상 여부를 확정할 수 없어 레코드를 보존함.
+- 다음 단계: 보험/특약 2건과 특약 5건의 출처를 증권 또는 감사 가능한 기록과 대조해 사용자가 삭제 대상을 확정. 그전까지 운영 데이터는 변경하지 않음. 샘플 시드 비활성화 브랜치는 별도 검토·병합·배포 전 상태.
 - `main` 커밋 `5d4b848`(보험증권 출처 근거 없이는 예상 보험금을 계산하지 않음)이 Cloud Run에 배포됨.
 - Cloud Run 리비전 `insurance-claim-mcp-00006-8vk`가 준비 상태이며 트래픽 100%를 받고, `/api/health`는 HTTP 200을 반환함.
 - 배포 시 앱 시작으로 `init_runtime()`과 스키마 초기화가 실행됨. migration 함수 호출은 확인했으나, DB에 추가된 컬럼 및 저장 데이터는 직접 조회하지 못했으므로 세부 DB 상태는 미확인.
-- 오늘 운영 DB를 읽기 전용으로 조회하려 했으나 조회 결과를 얻지 못함. 사용자/보험/특약 데이터는 확인되지 않았고, 어떤 레코드도 삭제·수정하지 않음.
-- 사용자 결정: 확보된 사용자 제출 데이터 범위에서만 서비스를 제공하고, 합성 샘플 `user_123`은 삭제할 것. 단, 삭제는 아직 하지 않음. AI 연결은 변경 예정이며 이번 작업 범위에서 보류.
-- 다음 작업은 DB 데이터를 먼저 확인하고, 시드가 샘플을 다시 생성하지 않도록 조치한 다음 샘플 삭제를 진행하는 것. 삭제 대상과 작업 직전 상태를 확인하고 나서 실행.
+- 운영 DB에서 표 전체 건수와 `user_123` 관련 건수·출처 표식만 확인함. 사용자별 별칭·보험 상세는 진행 보고에 포함하지 않음. 조회는 읽기 전용이었으며 어떤 운영 레코드도 삭제·수정하지 않음.
+- `user_123`의 계정 별칭은 샘플 표식과 일치하지만 보험·특약 출처가 합성 샘플로 확인되지 않았으므로 사용자 데이터가 섞였을 가능성을 배제할 수 없음. 별도 근거와 명시적 대상 확정 전 삭제 금지.
 - v1.0 전 약관·표준 수치의 근거, 미검증 한계 고지, 운영 개인정보 안내를 점검. AI 연결은 변경 방침이 정해진 뒤 별도 반영.
 - 현재까지 v1.0 릴리스 태그는 생성하지 않음.
 

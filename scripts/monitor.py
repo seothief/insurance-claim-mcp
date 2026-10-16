@@ -8,9 +8,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import base64
-import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -19,43 +16,18 @@ from typing import Any
 import httpx
 from sqlalchemy import text
 
-from claim_service.db.engine import create_db_engine
+# Allow direct execution from a source checkout without an editable install.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from gcloud_auth import get_adc_access_token  # noqa: E402
+from gcp_secrets import PROJECT_ID, get_database_url  # noqa: E402
+
+from claim_service.db.engine import create_db_engine  # noqa: E402
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-PROJECT_ID = "project-93d02748-0cbc-4596-902"
 SERVICE_NAME = "insurance-claim-mcp"
-
-
-
-def _get_gcp_token() -> str:
-    adc_path = Path(os.environ["APPDATA"]) / "gcloud" / "application_default_credentials.json"
-    adc = json.loads(adc_path.read_text(encoding="utf-8"))
-    resp = httpx.post(
-        "https://oauth2.googleapis.com/token",
-        data={
-            "client_id": adc["client_id"],
-            "client_secret": adc["client_secret"],
-            "refresh_token": adc["refresh_token"],
-            "grant_type": "refresh_token",
-        },
-        timeout=15.0,
-    )
-    resp.raise_for_status()
-    return str(resp.json()["access_token"])
-
-
-def _get_secret(token: str, secret_name: str) -> str:
-    url = (
-        f"https://secretmanager.googleapis.com/v1/projects/{PROJECT_ID}"
-        f"/secrets/{secret_name}/versions/latest:access"
-    )
-    resp = httpx.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=15.0)
-    resp.raise_for_status()
-    data_b64 = resp.json()["payload"]["data"]
-    return base64.b64decode(data_b64).decode("utf-8").strip()
-
 
 def _print_db_status(db_url: str) -> None:
     print("=== [1] Neon PostgreSQL DB 현황 ===")
@@ -127,8 +99,12 @@ def main() -> None:
     parser.add_argument("--interval", type=int, default=5, help="Refresh interval in seconds.")
     args = parser.parse_args()
 
-    token = _get_gcp_token()
-    db_url = _get_secret(token, "DATABASE_URL")
+    try:
+        token = get_adc_access_token()
+        db_url = get_database_url(token)
+    except (RuntimeError, httpx.HTTPError) as exc:
+        print(f"Google Cloud 인증 또는 Secret Manager 조회 실패: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None
     while True:
         if args.watch:
             print("\n" + "=" * 72)

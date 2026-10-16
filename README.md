@@ -31,8 +31,17 @@ python -m venv .venv
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe -m ruff check src tests
+.\.venv\Scripts\python.exe -m ruff check src tests scripts
+.\.venv\Scripts\python.exe -m mypy src
 ```
+
+## 배포
+
+`main`에 CI를 통과한 변경을 병합하면 GitHub Actions가 Cloud Run에 자동 배포하고
+`/api/health`, `/api/version`, `/llms.txt`를 확인합니다. 수동 배포는 GitHub의
+**Actions → Deploy to Cloud Run → Run workflow** 한 번으로 실행할 수 있습니다.
+최초 설정에 필요한 GitHub 변수, Workload Identity Federation 및 권한은
+[배포 설정 안내](docs/deployment.md)를 참조하세요. 운영 배포는 이 로컬 작업에서 실행하지 않습니다.
 
 ## 진행 현황
 [STATUS.md](STATUS.md)
