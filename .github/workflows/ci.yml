@@ -83,7 +83,8 @@ jobs:
           set -e
           curl -fsS http://localhost:8080/api/health
           curl -fsS http://localhost:8080/api/catalog/rules | python3 -c "import sys,json; assert json.load(sys.stdin)"
-          curl -fsS http://localhost:8080/api/users/user_123/policies | python3 -c "import sys,json; assert len(json.load(sys.stdin)) == 2"
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/users/user_123/policies)
+          test "$status" = "404"
           status=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:8080/mcp/ -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}')
           echo "MCP initialize HTTP status: $status"
           test "$status" = "200"

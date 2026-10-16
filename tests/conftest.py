@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from claim_service.config import get_settings
 from claim_service.db.engine import create_db_engine, init_schema
 from claim_service.db.tables import metadata
 from claim_service.main import create_app
@@ -31,7 +32,12 @@ def fresh_external_schema() -> Iterator[None]:
 
 
 @pytest.fixture
-def client(tmp_path: Path, fresh_external_schema: None) -> Iterator[TestClient]:
+def client(
+    tmp_path: Path, fresh_external_schema: None, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[TestClient]:
     """REST/MCP test client bound to a fresh database (SQLite by default, PostgreSQL in CI)."""
+    monkeypatch.setenv("SEED_SAMPLE_DATA", "true")
+    get_settings.cache_clear()
     with TestClient(create_app(database_url_for(tmp_path, "test.db"))) as test_client:
         yield test_client
+    get_settings.cache_clear()

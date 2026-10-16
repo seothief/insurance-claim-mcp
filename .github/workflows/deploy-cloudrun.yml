@@ -44,7 +44,7 @@ jobs:
             --project "${{ vars.GCP_PROJECT_ID }}" \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "APP_VERSION=${{ github.sha }}" \
+            --set-env-vars "APP_VERSION=${{ github.sha }},SEED_SAMPLE_DATA=false" \
             --set-secrets "DATABASE_URL=DATABASE_URL:latest,API_KEY=API_KEY:latest"
       - name: Verify health endpoint
         run: |

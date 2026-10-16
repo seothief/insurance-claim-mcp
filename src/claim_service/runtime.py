@@ -3,7 +3,7 @@
 from claim_service.config import get_settings
 from claim_service.db.engine import create_db_engine, init_schema
 from claim_service.db.repository import PolicyRepository
-from claim_service.db.seed import seed_all
+from claim_service.db.seed import seed_sample_user, seed_standard_rules
 from claim_service.service import PolicyService
 
 _service: PolicyService | None = None
@@ -18,8 +18,9 @@ def init_runtime(database_url: str | None = None, seed: bool | None = None) -> P
     repo = PolicyRepository(engine)
     service = PolicyService(repo)
     should_seed = settings.seed_sample_data if seed is None else seed
+    seed_standard_rules(repo)
     if should_seed:
-        seed_all(repo, service)
+        seed_sample_user(repo, service)
     _service = service
     return service
 

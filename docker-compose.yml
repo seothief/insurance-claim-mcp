@@ -23,7 +23,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://claim:${POSTGRES_PASSWORD:-claim_local_only}@db:5432/claim_service
       API_KEY: ${API_KEY:-}
-      SEED_SAMPLE_DATA: "true"
+      SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-false}
       APP_VERSION: ${APP_VERSION:-local}
     ports:
       - "8080:8080"

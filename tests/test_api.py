@@ -2,6 +2,10 @@
 
 from fastapi.testclient import TestClient
 
+from claim_service.config import get_settings
+from claim_service.main import create_app
+from tests.dbutil import database_url_for
+
 SAMPLE = "user_123"
 
 
@@ -23,6 +27,19 @@ def test_seeded_sample_user_is_ready_when_mapped(client: TestClient) -> None:
     assert mapped["골절진단비(샘플)"] == "FRACTURE_DIAGNOSIS"
     assert mapped["깁스치료비(샘플)"] == "CAST_TREATMENT"
     assert client.get(f"/api/users/{SAMPLE}").json()["onboarding_status"] == "READY"
+
+
+def test_sample_user_is_not_seeded_when_disabled(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("SEED_SAMPLE_DATA", "false")
+    get_settings.cache_clear()
+    with TestClient(create_app(database_url_for(tmp_path, "no-seed.db"))) as client:
+        assert client.get(f"/api/users/{SAMPLE}").status_code == 404
+        rules = client.get("/api/catalog/rules").json()
+        assert rules
+        assert all(rule["verified"] is False for rule in rules)
+    get_settings.cache_clear()
 
 
 def test_standard_rules_are_unverified(client: TestClient) -> None:

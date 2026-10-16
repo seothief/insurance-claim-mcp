@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = DEFAULT_DATABASE_URL
-    seed_sample_data: bool = True
+    seed_sample_data: bool = False
     # When set, every /api and /mcp request must send it as X-API-Key or Bearer token.
     # Leave empty for local development.
     api_key: str = ""
