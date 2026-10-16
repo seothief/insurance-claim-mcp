@@ -30,7 +30,7 @@ def test_seeded_sample_user_is_ready_when_mapped(client: TestClient) -> None:
 
 
 def test_sample_user_is_not_seeded_when_disabled(
-    tmp_path, monkeypatch
+    tmp_path, fresh_external_schema, monkeypatch
 ) -> None:
     monkeypatch.setenv("SEED_SAMPLE_DATA", "false")
     get_settings.cache_clear()
