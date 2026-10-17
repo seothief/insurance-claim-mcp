@@ -56,7 +56,6 @@ jobs:
             --region "$REGION" \
             --project "$PROJECT_ID" \
             --platform managed \
-            --allow-unauthenticated \
             --update-env-vars "APP_VERSION=${IMAGE##*:},SEED_SAMPLE_DATA=false,PUBLIC_BASE_URL=$PUBLIC_BASE_URL" \
             --update-secrets "DATABASE_URL=DATABASE_URL:latest,API_KEY=API_KEY:latest"
       - name: Verify deployment
