@@ -1,8 +1,14 @@
 # 진행 현황
 
-최종 갱신: 2026-10-17
+최종 갱신: 2026-10-19
 
-## 최신 진행 상황 (2026-10-17)
+## 최신 진행 상황 (2026-10-19)
+
+- MCP 3대 구성요소 완성(`feat/mcp-resources`): 기존 Tools(11개) 및 Prompts(1개)에 더해 읽기 전용 MCP Resources 3종(`insurance://guide/onboarding`, `insurance://rules/standard`, 동적 템플릿 `insurance://guide/document-request/{policy_type}/{product_name}`)을 `src/claim_service/mcp/server.py` 및 공개 소개(`src/claim_service/intro.py`)에 추가함.
+- 포트폴리오 문서 정비: `README.md`에 아키텍처 및 MCP 3요소 설계 의도를 보강하고, `docs/mcp-client-setup.md` 내 로컬 PC 파일 경로 메모를 제거함.
+- 검증: 전체 `pytest -q` 74 passed, `ruff check src tests scripts` 통과, `mypy src` 29개 파일 통과.
+
+## 이전 진행 상황 (2026-10-17)
 
 - 유지보수 개선(2026-10-17): 사용 이력이 확인된 Neon 스킬 파일은 유지. PoC `legacy/` 5개 파일 삭제. Cloud/Neon 운영 데이터는 변경하지 않음.
 - GCP Secret Manager 조회/DB URL 정규화를 `scripts/gcp_secrets.py`로 공통화하고 CI Ruff 검사에 `scripts/`를 포함. GitHub Actions `main` CI 성공 후 Cloud Run 자동 배포, main 수동 실행 및 `/api/health`, `/api/version`, `/llms.txt` 스모크 확인을 구성. `PUBLIC_BASE_URL` 누락도 배포 환경에서 보완함.

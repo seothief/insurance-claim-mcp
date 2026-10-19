@@ -232,3 +232,24 @@ def test_mcp_document_request_guide_uses_official_channels_only() -> None:
     prohibited_terms = ("토스", "뱅크샐러드", "화면 캡처", "스크래핑")
     assert not any(term in response_text for term in prohibited_terms)
 
+
+def test_mcp_resources_can_be_read(client: TestClient) -> None:
+    import json
+
+    async def run() -> tuple[dict[str, object], list[dict[str, object]], dict[str, object]]:
+        async with Client(mcp) as mcp_client:
+            onboarding = await mcp_client.read_resource("insurance://guide/onboarding")
+            rules = await mcp_client.read_resource("insurance://rules/standard")
+            doc_guide = await mcp_client.read_resource(
+                "insurance://guide/document-request/COMPREHENSIVE/test-policy"
+            )
+            return (
+                json.loads(onboarding[0].text),  # type: ignore[union-attr]
+                json.loads(rules[0].text),  # type: ignore[union-attr]
+                json.loads(doc_guide[0].text),  # type: ignore[union-attr]
+            )
+
+    onboarding_data, rules_data, doc_guide_data = asyncio.run(run())
+    assert onboarding_data["trigger_phrase"] == "보험비서 시작"
+    assert any(r["rule_id"] == "FRACTURE_DIAGNOSIS" for r in rules_data)
+    assert doc_guide_data["product_name"] == "test-policy"

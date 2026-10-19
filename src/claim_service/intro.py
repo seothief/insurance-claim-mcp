@@ -25,6 +25,19 @@ TOOLS: tuple[tuple[str, str], ...] = (
     ("evaluate_claim", "영수증 정보로 예상 보험금과 필요 서류 계산 (입력은 저장하지 않음)"),
 )
 
+RESOURCES: tuple[tuple[str, str], ...] = (
+    ("insurance://guide/onboarding", "온보딩 절차, 화면 캡처 안내, 지원 담보 요약 (정적 리소스)"),
+    ("insurance://rules/standard", "지원하는 표준 담보 규칙 카탈로그 및 검증 상태 (정적 리소스)"),
+    (
+        "insurance://guide/document-request/{policy_type}/{product_name}",
+        "보험사 공식 경로 증권·약관 요청 안내 및 문구 (동적 템플릿 리소스)",
+    ),
+)
+
+PROMPTS: tuple[tuple[str, str], ...] = (
+    ("insurance_assistant_prompt", "보험 등록 및 병원 영수증 예상 보험금 계산 표준 AI 비서 지침"),
+)
+
 LIMITS: tuple[str, ...] = (
     "**모든 약관 수치는 아직 약관 원문과 대조하지 않았습니다(verified=false).** "
     "결과는 '예상치'이며 지급 확정이 아닙니다.",
@@ -96,6 +109,8 @@ def build_markdown(base_url: str = "") -> str:
         for rule in STANDARD_RULES
     )
     tools = "\n".join(f"- `{name}`: {desc}" for name, desc in TOOLS)
+    resources = "\n".join(f"- `{uri}`: {desc}" for uri, desc in RESOURCES)
+    prompts = "\n".join(f"- `{name}`: {desc}" for name, desc in PROMPTS)
     limits = "\n".join(f"- {item}" for item in LIMITS)
     questions = "\n".join(f"{i}. {q}" for i, q in enumerate(QUESTIONS, start=1))
     start_url = f"{base_url.rstrip('/')}/start" if base_url else "/start"
@@ -131,8 +146,14 @@ def build_markdown(base_url: str = "") -> str:
 가입: 골절진단비 300,000원, 깁스치료비 500,000원 (가상 데이터)
 
 {_example()}
-## 제공 도구 (MCP, {len(TOOLS)}개)
+## 제공 도구 (MCP Tools, {len(TOOLS)}개)
 {tools}
+
+## 제공 리소스 (MCP Resources, {len(RESOURCES)}개)
+{resources}
+
+## 제공 프롬프트 (MCP Prompts, {len(PROMPTS)}개)
+{prompts}
 
 ## 지원하는 담보
 {rules}

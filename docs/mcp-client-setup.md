@@ -13,7 +13,7 @@
 - **MCP 엔드포인트 (Streamable HTTP)**: `https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/mcp` (`/mcp`와 `/mcp/` 모두 동작)
 - **OpenAPI 스키마 주소**: `https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/openapi.json`
 - **인증 헤더**: `X-API-Key: <서버 API_KEY>` 또는 `Authorization: Bearer <서버 API_KEY>`
-  (주 작업 PC의 키 위치: `C:\Users\seoth\secrets\api_key.txt`, 클라우드: GCP Secret Manager `API_KEY`)
+  (클라우드 배포 환경에서는 GCP Secret Manager의 `API_KEY` 시크릿으로 주입)
 
 모든 요청에는 서버 공용 `X-API-Key`가 필요합니다. 사용자 데이터가 필요한 AI 클라이언트는 본인의 `X-User-Id`를 설정해 해당 별명에 요청을 귀속시킬 수 있습니다. 사용자 ID는 인증 수단이 아니며, 이를 통해 PIN 보호가 해제되지 않습니다. PIN 보호 계정은 `X-User-Pin` 또는 도구의 PIN 입력도 필요합니다.
 

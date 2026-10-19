@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from fastmcp import Client
 
 from claim_service.config import get_settings
-from claim_service.intro import TOOLS, build_html, build_markdown
+from claim_service.intro import PROMPTS, RESOURCES, TOOLS, build_html, build_markdown
 from claim_service.main import create_app
 from claim_service.mcp.server import mcp
 from tests.dbutil import database_url_for
@@ -103,6 +103,21 @@ def test_listed_tools_match_the_real_mcp_tools() -> None:
             return {tool.name for tool in await client.list_tools()}
 
     assert {name for name, _ in TOOLS} == asyncio.run(names())
+
+
+def test_listed_resources_and_prompts_match_the_real_mcp_server() -> None:
+    async def check() -> tuple[set[str], set[str]]:
+        async with Client(mcp) as client:
+            static_uris = {str(r.uri) for r in await client.list_resources()}
+            template_uris = {
+                str(t.uri_template) for t in await client.list_resource_templates()
+            }
+            prompt_names = {p.name for p in await client.list_prompts()}
+            return static_uris | template_uris, prompt_names
+
+    resource_uris, prompt_names = asyncio.run(check())
+    assert {uri for uri, _ in RESOURCES} == resource_uris
+    assert {name for name, _ in PROMPTS} == prompt_names
 
 
 def test_example_is_computed_by_the_engine_and_shows_the_cast_difference() -> None:

@@ -57,6 +57,31 @@ def insurance_assistant_prompt(user_id: str = "me") -> str:
     return f"{ASSISTANT_INSTRUCTIONS}\n현재 대화의 기본 user_id 후보: {user_id}"
 
 
+@mcp.resource("insurance://guide/onboarding")
+def onboarding_guide_resource() -> dict[str, object]:
+    """온보딩 절차, 화면 캡처 안내, 지원 담보 목록을 제공하는 읽기 전용 MCP 리소스입니다."""
+    guide = dict(get_service().onboarding_guide())
+    guide["trigger_phrase"] = "보험비서 시작"
+    guide["bound_user_id"] = get_bound_user()
+    return guide
+
+
+@mcp.resource("insurance://rules/standard")
+def standard_rules_resource() -> list[dict[str, object]]:
+    """지원하는 표준 담보 규칙 카탈로그와 검증 여부(verified)를 제공하는 읽기 전용 리소스입니다."""
+    return [rule.model_dump() for rule in get_service().rules().values()]
+
+
+@mcp.resource("insurance://guide/document-request/{policy_type}/{product_name}")
+def document_request_guide_resource(
+    policy_type: str, product_name: str
+) -> dict[str, object]:
+    """보험사 공식 경로로 증권·약관 서류를 요청하는 안내를 제공하는 동적 템플릿 리소스입니다."""
+    kind: PolicyKind = _to_guide_kind(policy_type.upper())
+    return request_guide(kind, product_name)
+
+
+
 def _guard[T](call: Callable[[], T]) -> T:
     """Turn domain errors into readable tool errors instead of server crashes."""
     try:
