@@ -9,11 +9,17 @@ but can fetch `GET` URLs via built-in web browsing tools. Every user operation o
 
 from __future__ import annotations
 
+import html
+import json
 import re
 import time
-from typing import Annotated, cast
+from collections.abc import Callable, Coroutine
+from typing import Annotated, Any, cast
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse
+from fastapi.routing import APIRoute
 
 from claim_service.domain.errors import (
     AccessDeniedError,
@@ -40,7 +46,86 @@ from claim_service.domain.models import (
 )
 from claim_service.runtime import get_service
 
-router = APIRouter(prefix="/ai", include_in_schema=False)
+_HTML_USER_AGENTS = (
+    "chatgpt-user",
+    "oai-searchbot",
+    "claude-web",
+    "claudebot",
+    "perplexity",
+    "mozilla",
+)
+
+
+def _wants_html(request: Request) -> bool:
+    fmt = (request.query_params.get("format") or "").lower()
+    if fmt == "json":
+        return False
+    if fmt == "html":
+        return True
+    accept = (request.headers.get("accept") or "").lower()
+    if "text/html" in accept:
+        return True
+    ua = (request.headers.get("user-agent") or "").lower()
+    return any(token in ua for token in _HTML_USER_AGENTS)
+
+
+def _wrap_json_as_html(payload_obj: Any, title: str = "보험 청구 도우미 AI 응답") -> HTMLResponse:
+    pretty = html.escape(json.dumps(payload_obj, ensure_ascii=False, indent=2))
+    page = f"""<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{html.escape(title)}</title>
+</head>
+<body>
+<main>
+<h1>{html.escape(title)}</h1>
+<pre style="white-space: pre-wrap; font-family: monospace; line-height: 1.5">{pretty}</pre>
+</main>
+</body>
+</html>
+"""
+    return HTMLResponse(content=page, status_code=status.HTTP_200_OK)
+
+
+class _AiBridgeRoute(APIRoute):
+    """Serve `text/html` wrapping JSON for AI web-browsing bots (ChatGPT-User, etc.)."""
+
+    def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
+        original_handler = super().get_route_handler()
+
+        async def custom_handler(request: Request) -> Response:
+            if not _wants_html(request):
+                return await original_handler(request)
+            try:
+                response = await original_handler(request)
+                raw_body = bytes(response.body).decode("utf-8")
+                parsed = json.loads(raw_body)
+                return _wrap_json_as_html(parsed)
+            except HTTPException as exc:
+                return _wrap_json_as_html(
+                    {
+                        "ok": False,
+                        "status_code": exc.status_code,
+                        "detail": exc.detail,
+                    },
+                    title="보험 청구 도우미 오류 안내",
+                )
+            except RequestValidationError as exc:
+                return _wrap_json_as_html(
+                    {
+                        "ok": False,
+                        "status_code": status.HTTP_422_UNPROCESSABLE_CONTENT,
+                        "detail": exc.errors(),
+                    },
+                    title="보험 청구 도우미 입력 형식 오류",
+                )
+
+        return custom_handler
+
+
+router = APIRouter(prefix="/ai", include_in_schema=False, route_class=_AiBridgeRoute)
 
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_SECONDS = 300.0

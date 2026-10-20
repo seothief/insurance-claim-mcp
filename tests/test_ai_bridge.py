@@ -148,3 +148,41 @@ def test_ai_bridge_blocks_unpinned_accounts_and_brute_force(
         "/ai/policies", params={"user_id": "locked_user", "pin": "9999"}
     )
     assert locked.status_code == 429
+
+
+def test_chatgpt_user_agent_receives_html_and_robots_txt(
+    keyed_client: TestClient,
+) -> None:
+    chatgpt_headers = {
+        "User-Agent": (
+            "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); "
+            "compatible; ChatGPT-User/1.0; +https://openai.com/bot"
+        ),
+        "Host": "insurance-claim.example.org",
+    }
+    robots = keyed_client.get("/robots.txt", headers=chatgpt_headers)
+    assert robots.status_code == 200
+    assert "Allow: /" in robots.text
+
+    start_md = keyed_client.get("/start.md", headers=chatgpt_headers)
+    assert start_md.status_code == 200
+    assert start_md.headers["content-type"].startswith("text/html")
+    assert "https://insurance-claim.example.org/ai/onboard" in start_md.text
+
+    onboard_html = keyed_client.get(
+        "/ai/onboard",
+        params={"user_id": "gpt_user", "pin": "4321"},
+        headers=chatgpt_headers,
+    )
+    assert onboard_html.status_code == 200
+    assert onboard_html.headers["content-type"].startswith("text/html")
+    assert "&quot;user_id&quot;: &quot;gpt_user&quot;" in onboard_html.text
+
+    wrong_pin_html = keyed_client.get(
+        "/ai/policies",
+        params={"user_id": "gpt_user", "pin": "0000"},
+        headers=chatgpt_headers,
+    )
+    assert wrong_pin_html.status_code == 200
+    assert wrong_pin_html.headers["content-type"].startswith("text/html")
+    assert "&quot;status_code&quot;: 403" in wrong_pin_html.text

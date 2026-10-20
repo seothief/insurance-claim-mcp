@@ -9,7 +9,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastmcp.utilities.lifespan import combine_lifespans
 
@@ -37,6 +37,26 @@ def _db_lifespan(database_url: str | None) -> Callable[[FastAPI], Any]:
     return lifespan
 
 
+_AI_HTML_BOTS = ("chatgpt-user", "oai-searchbot", "claude-web", "claudebot", "perplexity")
+
+
+def _is_ai_html_reader(request: Request) -> bool:
+    ua = (request.headers.get("user-agent") or "").lower()
+    return any(bot in ua for bot in _AI_HTML_BOTS)
+
+
+def _resolve_base_url(request: Request, configured_base_url: str) -> str:
+    host = (request.headers.get("host") or "").strip()
+    if (
+        host
+        and host not in ("testserver", "localhost")
+        and not host.startswith(("127.0.0.1", "localhost:"))
+    ):
+        proto = (request.headers.get("x-forwarded-proto") or "https").split(",")[0].strip()
+        return f"{proto}://{host}"
+    return configured_base_url
+
+
 def create_app(database_url: str | None = None) -> FastAPI:
     base_url = get_settings().public_base_url.strip().rstrip("/")
     app = FastAPI(
@@ -45,6 +65,16 @@ def create_app(database_url: str | None = None) -> FastAPI:
         lifespan=combine_lifespans(_db_lifespan(database_url), mcp_app.lifespan),
         servers=[{"url": base_url}] if base_url else None,
     )
+
+    @app.get("/robots.txt", include_in_schema=False, response_class=PlainTextResponse)
+    def robots_txt() -> PlainTextResponse:
+        return PlainTextResponse(
+            "User-agent: *\nAllow: /\n", media_type="text/plain; charset=utf-8"
+        )
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon() -> Response:
+        return Response(status_code=204)
 
     @app.get("/api/health", include_in_schema=False)
     def health() -> dict[str, Any]:
@@ -55,29 +85,36 @@ def create_app(database_url: str | None = None) -> FastAPI:
         return JSONResponse({"service": "insurance-claim-mcp", "version": APP_VERSION})
 
     @app.get("/", include_in_schema=False, response_class=HTMLResponse)
-    def intro_page() -> HTMLResponse:
-        return HTMLResponse(build_html(base_url))
+    def intro_page(request: Request) -> HTMLResponse:
+        return HTMLResponse(build_html(_resolve_base_url(request, base_url)))
 
-    @app.get("/about.md", include_in_schema=False, response_class=PlainTextResponse)
-    def intro_markdown() -> PlainTextResponse:
+    @app.get("/about.md", include_in_schema=False)
+    def intro_markdown(request: Request) -> Response:
+        effective = _resolve_base_url(request, base_url)
+        if _is_ai_html_reader(request):
+            return HTMLResponse(build_html(effective))
         return PlainTextResponse(
-            build_markdown(base_url), media_type="text/markdown; charset=utf-8"
+            build_markdown(effective), media_type="text/markdown; charset=utf-8"
         )
 
     @app.get("/llms.txt", include_in_schema=False, response_class=PlainTextResponse)
-    def intro_llms() -> PlainTextResponse:
+    def intro_llms(request: Request) -> PlainTextResponse:
         return PlainTextResponse(
-            build_markdown(base_url), media_type="text/plain; charset=utf-8"
+            build_markdown(_resolve_base_url(request, base_url)),
+            media_type="text/plain; charset=utf-8",
         )
 
     @app.get("/start", include_in_schema=False, response_class=HTMLResponse)
-    def start_page() -> HTMLResponse:
-        return HTMLResponse(build_start_html(base_url))
+    def start_page(request: Request) -> HTMLResponse:
+        return HTMLResponse(build_start_html(_resolve_base_url(request, base_url)))
 
-    @app.get("/start.md", include_in_schema=False, response_class=PlainTextResponse)
-    def start_markdown() -> PlainTextResponse:
+    @app.get("/start.md", include_in_schema=False)
+    def start_markdown(request: Request) -> Response:
+        effective = _resolve_base_url(request, base_url)
+        if _is_ai_html_reader(request):
+            return HTMLResponse(build_start_html(effective))
         return PlainTextResponse(
-            build_start_markdown(base_url), media_type="text/markdown; charset=utf-8"
+            build_start_markdown(effective), media_type="text/markdown; charset=utf-8"
         )
 
     app.include_router(api_router)

@@ -22,6 +22,8 @@ PUBLIC_PATHS = frozenset(
         "/about.md",
         "/start",
         "/start.md",
+        "/robots.txt",
+        "/favicon.ico",
     }
 )
 Scope = MutableMapping[str, Any]

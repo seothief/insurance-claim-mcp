@@ -5,8 +5,9 @@
 ## 최신 진행 상황 (2026-10-20)
 
 - 스마트폰 무료 AI 앱 개인화 웹 브릿지(`/ai/*`) 추가: MCP나 Custom GPT 설정이 없는 스마트폰 기본 AI 앱(무료 ChatGPT 앱, Gemini 앱, Claude 모바일 앱 등)에서도 내장 웹 읽기(GET) 기능만으로 공통 DB(`user_id` + `pin`)에 접근해 개인화 온보딩(`/ai/onboard`), 보험증권 사진 판독 후 등록/갱신(`/ai/register-policy`), 미매핑 특약 확정(`/ai/resolve-rider`), 등록 보험 조회/삭제(`/ai/policies`, `/ai/delete-policy`), 병원 영수증 기반 예상 보험금 계산(`/ai/evaluate`)을 수행할 수 있도록 `src/claim_service/api/ai_bridge.py` 및 `/start`(`src/claim_service/start_guide.py`)를 구현함.
+- 모바일 ChatGPT 웹 리더(`ChatGPT-User`, `OAI-SearchBot`) 호환성 보완: `/robots.txt` 및 `/favicon.ico`를 공개 경로로 열어 크롤러 401 차단을 해제하고, AI 웹 리더가 `/start.md` 또는 `/ai/*`를 열 때 `text/markdown`·`application/json` 대신 `text/html` 페이지로 응답하도록 보완함. 또한 접속한 도메인(`Host`)과 동일한 도메인으로 안내 링크를 생성하도록 개선함.
 - 보안 강화: `/ai/*` 경로는 4~32자 PIN 입력을 강제하며, PIN이 설정되지 않은 기존 계정(예: `user_123`)의 접근을 차단(HTTP 403)하고, 계정별 연속 5회 PIN 오입력 시 5분간 요청을 차단(HTTP 429)하는 무차별 대입 방어 로직을 적용함.
-- 검증: 전체 `pytest -q` 77 passed, `ruff check src tests scripts` 통과, `mypy src` 30개 파일 통과.
+- 검증: 전체 `pytest -q` 78 passed, `ruff check src tests scripts` 통과, `mypy src` 30개 파일 통과.
 
 ## 이전 진행 상황 (2026-10-19)
 
