@@ -71,6 +71,14 @@ def _wants_html(request: Request) -> bool:
 
 def _wrap_json_as_html(payload_obj: Any, title: str = "보험 청구 도우미 AI 응답") -> HTMLResponse:
     pretty = html.escape(json.dumps(payload_obj, ensure_ascii=False, indent=2))
+    copy_js = (
+        "navigator.clipboard.writeText(document.getElementById('payload').innerText)"
+        ".then(function(){alert('복사되었습니다. AI 채팅창에 붙여넣으세요.');})"
+    )
+    pre_style = (
+        "white-space: pre-wrap; font-family: monospace; line-height: 1.5; "
+        "background: #f6f8fa; padding: 1rem; border-radius: 8px"
+    )
     page = f"""<!doctype html>
 <html lang="ko">
 <head>
@@ -78,10 +86,12 @@ def _wrap_json_as_html(payload_obj: Any, title: str = "보험 청구 도우미 A
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)}</title>
 </head>
-<body>
+<body style="font-family: sans-serif; max-width: 720px; margin: 1.5rem auto; padding: 0 1rem">
 <main>
 <h1>{html.escape(title)}</h1>
-<pre style="white-space: pre-wrap; font-family: monospace; line-height: 1.5">{pretty}</pre>
+<p>처리가 완료되었습니다. 아래 버튼을 눌러 AI 채팅창에 붙여넣거나 채팅 화면으로 돌아가세요.</p>
+<p><button type="button" onclick="{copy_js}">결과 복사하기</button></p>
+<pre id="payload" style="{pre_style}">{pretty}</pre>
 </main>
 </body>
 </html>
@@ -432,3 +442,44 @@ def ai_evaluate_claim(
         return get_service().evaluate(user_id, claim, pin=pin)
     except DomainError as exc:
         raise _raise_ai_http(user_id, exc) from exc
+
+
+def build_user_context_json(user_id: str, pin: str) -> str:
+    """Build a single-fetch JSON snapshot (profile + policies + rules) for `/u/{user_id}/{pin}`."""
+    if not re.match(r"^[A-Za-z0-9_-]{1,64}$", user_id) or not (4 <= len(pin) <= 32):
+        return json.dumps(
+            {
+                "ok": False,
+                "status_code": status.HTTP_422_UNPROCESSABLE_CONTENT,
+                "detail": "user_id(영문/숫자 1~64자)와 pin(4~32자) 형식을 확인해 주세요.",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    try:
+        profile = ai_onboard(user_id=user_id, pin=pin, display_alias=user_id, birth_year=None)
+        policies = get_service().list_policies(user_id, pin=pin)
+        rules = list(get_service().rules().values())
+        return json.dumps(
+            {
+                "ok": True,
+                "profile": profile.model_dump(mode="json"),
+                "policies": [p.model_dump(mode="json") for p in policies],
+                "standard_rules": [r.model_dump(mode="json") for r in rules],
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    except HTTPException as exc:
+        return json.dumps(
+            {"ok": False, "status_code": exc.status_code, "detail": exc.detail},
+            ensure_ascii=False,
+            indent=2,
+        )
+    except DomainError as exc:
+        http_exc = _raise_ai_http(user_id, exc)
+        return json.dumps(
+            {"ok": False, "status_code": http_exc.status_code, "detail": http_exc.detail},
+            ensure_ascii=False,
+            indent=2,
+        )

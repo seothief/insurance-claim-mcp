@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastmcp.utilities.lifespan import combine_lifespans
 
+from claim_service.api.ai_bridge import build_user_context_json
 from claim_service.api.ai_bridge import router as ai_router
 from claim_service.api.auth import ApiKeyMiddleware
 from claim_service.api.routes import router as api_router
@@ -105,17 +106,29 @@ def create_app(database_url: str | None = None) -> FastAPI:
         )
 
     @app.get("/start", include_in_schema=False, response_class=HTMLResponse)
-    def start_page(request: Request) -> HTMLResponse:
-        return HTMLResponse(build_start_html(_resolve_base_url(request, base_url)))
+    def start_page(
+        request: Request, user_id: str | None = None, pin: str | None = None
+    ) -> HTMLResponse:
+        ctx = build_user_context_json(user_id, pin) if (user_id and pin) else None
+        return HTMLResponse(build_start_html(_resolve_base_url(request, base_url), ctx))
 
     @app.get("/start.md", include_in_schema=False)
-    def start_markdown(request: Request) -> Response:
+    def start_markdown(
+        request: Request, user_id: str | None = None, pin: str | None = None
+    ) -> Response:
         effective = _resolve_base_url(request, base_url)
+        ctx = build_user_context_json(user_id, pin) if (user_id and pin) else None
         if _is_ai_html_reader(request):
-            return HTMLResponse(build_start_html(effective))
+            return HTMLResponse(build_start_html(effective, ctx))
         return PlainTextResponse(
-            build_start_markdown(effective), media_type="text/markdown; charset=utf-8"
+            build_start_markdown(effective, ctx), media_type="text/markdown; charset=utf-8"
         )
+
+    @app.get("/u/{user_id}/{pin}", include_in_schema=False, response_class=HTMLResponse)
+    def user_start_page(request: Request, user_id: str, pin: str) -> HTMLResponse:
+        effective = _resolve_base_url(request, base_url)
+        ctx = build_user_context_json(user_id, pin)
+        return HTMLResponse(build_start_html(effective, ctx))
 
     app.include_router(api_router)
     app.include_router(ai_router)

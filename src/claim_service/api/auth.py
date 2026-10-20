@@ -70,7 +70,7 @@ class ApiKeyMiddleware:
         if scope.get("path") == "/mcp":
             scope["path"] = "/mcp/"
         path = str(scope.get("path") or "")
-        if path in PUBLIC_PATHS or path.startswith("/ai/"):
+        if path in PUBLIC_PATHS or path.startswith(("/ai/", "/u/")):
             await self._app(scope, receive, send)
             return
         provided, requested_user, header_pin = _extract_headers(scope.get("headers", []))

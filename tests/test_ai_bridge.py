@@ -186,3 +186,10 @@ def test_chatgpt_user_agent_receives_html_and_robots_txt(
     assert wrong_pin_html.status_code == 200
     assert wrong_pin_html.headers["content-type"].startswith("text/html")
     assert "&quot;status_code&quot;: 403" in wrong_pin_html.text
+
+    single_fetch = keyed_client.get("/u/gpt_user/4321", headers=chatgpt_headers)
+    assert single_fetch.status_code == 200
+    assert single_fetch.headers["content-type"].startswith("text/html")
+    assert "현재 로그인된 사용자의 실시간 DB 데이터" in single_fetch.text
+    assert "&quot;user_id&quot;: &quot;gpt_user&quot;" in single_fetch.text
+    assert "&quot;standard_rules&quot;" in single_fetch.text
