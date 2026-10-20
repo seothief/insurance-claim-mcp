@@ -13,8 +13,8 @@
   - **Tools (11개)**: 사용자 등록(`register_user`), 보험 등록/갱신(`register_user_policy`), 미매핑 특약 재질의 확정(`resolve_user_rider`), 예상 보험금 계산(`evaluate_claim`) 등 상태 변경 및 연산 수행
   - **Resources (3개)**: 온보딩 가이드(`insurance://guide/onboarding`), 표준 담보 규칙 카탈로그(`insurance://rules/standard`), 보험사 공식 서류 요청 안내 동적 템플릿(`insurance://guide/document-request/{policy_type}/{product_name}`)
   - **Prompts (1개)**: 단계별 보험 등록 및 영수증 평가를 유도하는 표준 AI 비서 지침(`insurance_assistant_prompt`) 및 `ai_follow_up_prompt` 기반 역질문 오케스트레이션
-- **Dual-Interface 및 서버리스 최적화**
-  - 단일 도메인 서비스 레이어 위에 **FastMCP (`Streamable HTTP /mcp` 및 로컬 `stdio`)**와 **FastAPI REST API (`/api/*`, `/openapi.json`)**를 동시에 제공하여 Claude, Antigravity, Cursor, Gemini CLI뿐만 아니라 ChatGPT Custom GPT(Actions)까지 모두 지원합니다.
+- **Multi-Interface(MCP · REST · 모바일 AI 웹 브릿지) 및 서버리스 최적화**
+  - 단일 도메인 서비스 레이어와 공통 DB 위에 **FastMCP (`Streamable HTTP /mcp` 및 로컬 `stdio`)**, **FastAPI REST API (`/api/*`, `/openapi.json`)**, 그리고 **스마트폰 무료 AI 앱용 PIN 인증 GET 브릿지 (`/ai/*`)**를 동시에 제공하여 Claude, Antigravity, Cursor, Gemini CLI, ChatGPT Custom GPT(Actions)뿐만 아니라 일반 스마트폰 무료 AI 앱(ChatGPT·Gemini·Claude 기본 앱)에서도 별도 설치 없이 개인화된 보험증권 등록과 영수증 평가를 수행할 수 있습니다.
   - Cloud Run 서버리스 스케일링 환경을 위해 `stateless_http=True` 및 `combine_lifespans`를 적용하고, 리버스 프록시 뒤에서 `/mcp` 307 리다이렉트 시 발생하는 HTTPS→HTTP 다운그레이드를 ASGI 미들웨어 경로 정규화로 해결했습니다.
 
 ## 로컬 실행
@@ -27,6 +27,7 @@ python -m venv .venv
 
 - 상태 확인: `GET /api/health`
 - 공개 소개 및 AI 안내: `GET /`, `GET /start`, `GET /llms.txt`
+- 스마트폰 AI 앱 개인화 웹 브릿지 (PIN 인증): `GET /ai/guide`, `GET /ai/onboard`, `GET /ai/register-policy`, `GET /ai/resolve-rider`, `GET /ai/policies`, `GET /ai/evaluate`
 - MCP 엔드포인트 (Streamable HTTP): `POST /mcp` (또는 `/mcp/`)
 - MCP 로컬 실행 (stdio): `.\.venv\Scripts\python.exe -m claim_service.mcp.server`
 

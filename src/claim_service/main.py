@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastmcp.utilities.lifespan import combine_lifespans
 
+from claim_service.api.ai_bridge import router as ai_router
 from claim_service.api.auth import ApiKeyMiddleware
 from claim_service.api.routes import router as api_router
 from claim_service.config import get_settings
@@ -80,6 +81,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         )
 
     app.include_router(api_router)
+    app.include_router(ai_router)
     app.mount(MCP_PATH, mcp_app)
     api_key = get_settings().api_key
     app.add_middleware(ApiKeyMiddleware, api_key=api_key)

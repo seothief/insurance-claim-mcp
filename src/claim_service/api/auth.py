@@ -67,7 +67,8 @@ class ApiKeyMiddleware:
         # Cloud Run's proxy and is rejected by strict MCP clients.
         if scope.get("path") == "/mcp":
             scope["path"] = "/mcp/"
-        if scope.get("path") in PUBLIC_PATHS:
+        path = str(scope.get("path") or "")
+        if path in PUBLIC_PATHS or path.startswith("/ai/"):
             await self._app(scope, receive, send)
             return
         provided, requested_user, header_pin = _extract_headers(scope.get("headers", []))
