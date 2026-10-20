@@ -75,6 +75,10 @@ def build_onboarding_guide(rules: Iterable[CoverageRule]) -> dict[str, object]:
         },
         "document_policy": OFFICIAL_CHANNEL_POLICY,
         "capture_guide_for_users": [
+            "전체 보험 한 번에 가져오기(추천): 한국신용정보원(credit4u.or.kr)에 로그인해 "
+            "[보험신용정보 > 정액형보험 / 실손형보험]으로 들어가 각 계약의 하단 상세 표"
+            "(보장구분·보장명·보장상태·보장금액)를 열거나 [정액형보장 상세내역 발급]을 받으세요. "
+            "브라우저 제어 기능이 있는 AI라면 이 경로로 이동해 상세내역을 직접 읽어 등록하세요.",
             "보험사 공식 앱 또는 보험사 홈페이지에 본인이 로그인해 '보험증권(가입증서)' 또는 "
             "'계약상세'에서 담보별 가입금액이 적힌 화면을 여세요. 이 화면을 기준으로 등록합니다.",
             "보험증권을 보험사 고객센터(전화, 채팅), 우편, 이메일, 팩스, 지점에서 받을 수 있다면 "
@@ -94,6 +98,10 @@ def build_onboarding_guide(rules: Iterable[CoverageRule]) -> dict[str, object]:
 
 OFFICIAL_CHANNEL_POLICY: dict[str, object] = {
     "allowed_channels": [
+        (
+            "한국신용정보원 본인신용정보 열람서비스(credit4u.or.kr) > 보험신용정보 > "
+            "정액형·실손형보험 > 상세내역 발급"
+        ),
         "보험사 공식 앱",
         "보험사 공식 홈페이지의 본인 로그인 메뉴",
         "보험사 고객센터(전화, 채팅)",

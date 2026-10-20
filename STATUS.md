@@ -7,6 +7,7 @@
 - 스마트폰 무료 AI 앱 개인화 웹 브릿지(`/ai/*`) 추가: MCP나 Custom GPT 설정이 없는 스마트폰 기본 AI 앱(무료 ChatGPT 앱, Gemini 앱, Claude 모바일 앱 등)에서도 내장 웹 읽기(GET) 기능만으로 공통 DB(`user_id` + `pin`)에 접근해 개인화 온보딩(`/ai/onboard`), 보험증권 사진 판독 후 등록/갱신(`/ai/register-policy`), 미매핑 특약 확정(`/ai/resolve-rider`), 등록 보험 조회/삭제(`/ai/policies`, `/ai/delete-policy`), 병원 영수증 기반 예상 보험금 계산(`/ai/evaluate`)을 수행할 수 있도록 `src/claim_service/api/ai_bridge.py` 및 `/start`(`src/claim_service/start_guide.py`)를 구현함.
 - 모바일 ChatGPT 웹 리더(`ChatGPT-User`, `OAI-SearchBot`) 호환성 및 단일 조회(`/u/{user_id}/{pin}`) 보완: `/robots.txt` 및 `/favicon.ico`를 공개 경로로 열어 크롤러 401 차단을 해제하고, AI 웹 리더가 `/start.md` 또는 `/ai/*`를 열 때 `text/markdown`·`application/json` 대신 `text/html` 페이지로 응답하도록 보완함. 또한 모바일 ChatGPT의 URL 샌드박스(AI가 임의 조합한 URL 호출 차단)에서도 한 번의 접속만으로 사용자 프로필·등록 보험 전체 목록·표준 규칙을 즉시 읽을 수 있도록 `/u/{user_id}/{pin}`(및 `/start?user_id=...&pin=...`) 단일 조회 경로를 추가함.
 - 보안 및 도배(Spam) 방어 강화: `/ai/*` 및 `/u/*` 경로는 4~32자 PIN 입력을 강제하며, PIN이 설정되지 않은 기존 계정(예: `user_123`)의 접근을 차단(HTTP 403)하고, 계정별 연속 5회 PIN 오입력 시 5분간 요청을 차단(HTTP 429)함. 또한 공개 커뮤니티 유입 시 악성 스크립트 도배를 막기 위해 IP당 5분 내 쓰기 요청 제한(20회), 전역 신규 계정 생성 제한(5분당 60개), 계정당 최대 보험 등록 건수 제한(20건)을 적용함.
+- 한국신용정보원 본인신용정보 열람서비스(`credit4u.or.kr`) 상세내역 확보 경로 추가: `document_guide.py`, `onboarding.py`, `start_guide.py`, `intro.py`, `mcp/server.py`에 `credit4u.or.kr > 보험신용정보 > 정액형·실손형보험 > 상세내역 발급(보장구분·보장명·보장금액 표)` 안내 및 브라우저 제어 AI용 수집 지침을 추가함.
 - 검증: 전체 `pytest -q` 79 passed, `ruff check src tests scripts` 통과, `mypy src` 30개 파일 통과.
 
 ## 이전 진행 상황 (2026-10-19)

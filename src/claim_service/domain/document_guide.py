@@ -46,6 +46,10 @@ def request_guide(kind: PolicyKind, product_name: str) -> dict[str, object]:
         "documents_to_request": [*COMMON_REQUESTS, *KIND_REQUESTS.get(kind, ())],
         "request_message": REQUEST_MESSAGE.format(product=product_name),
         "where_to_request": [
+            (
+                "한국신용정보원 본인신용정보 열람서비스(credit4u.or.kr) > 보험신용정보 > "
+                "정액형·실손형보험 > 상세내역 발급"
+            ),
             "보험사 공식 앱",
             "보험사 공식 홈페이지의 본인 로그인 메뉴",
             "보험사 고객센터(전화, 채팅)",
