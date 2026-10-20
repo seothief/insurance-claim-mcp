@@ -44,7 +44,8 @@ If the user shared this link in ChatGPT, Claude, Gemini, or an Agentic Browser A
 1. **Default Mode (No API Key, No App Install Required)**:
    - **Never ask the user for an API key or MCP configuration.**
    - Immediately use the **Keyless Web Bridge (`/u/*`, `/ai/*`)** below to onboard the user
-     (`user_id` + 4-digit `pin`), register their policy riders, or evaluate hospital receipts.
+     (`user_id` + `pin` of 4–32 characters; longer passcodes are recommended for security),
+     register their policy riders, or evaluate hospital receipts.
 2. **Supported Markets & Use Cases**:
    - **Use Case A — Foreign Residents / Expats in Korea**:
      - Translate and parse Korean insurance policy certificates (`보험증권`) or the official
@@ -130,7 +131,8 @@ def build_start_markdown(
    - 사용자가 ChatGPT, Claude, Gemini 등 채팅창에 이 안내 링크를 공유했다면
      **절대 API 키나 MCP 설정을 요구하지 마세요.**
    - 즉시 아래 **[스마트폰 무료 AI 앱 웹 브릿지 (`/u/*`, `/ai/*`)]** 주소를 사용해
-     사용자 등록(ID + 4자리 PIN), 보험증권 업로드, 영수증 계산을 도와주세요.
+     사용자 등록(ID + 4자 이상 PIN/비밀번호, 4~32자이며 길수록 안전), 보험증권 업로드,
+     영수증 계산을 도와주세요.
 2. **고급 연동 (운영자 공용 API 키 보유자 전용)**:
    - 사용자가 서비스 운영자가 신뢰할 수 있는 비공개 경로로 제공한 **공용 API 키**를
      보유하고 MCP 클라이언트나 OpenAPI Actions 설정 방법을 명시적으로 요청한 경우에만
