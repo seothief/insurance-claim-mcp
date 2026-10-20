@@ -213,3 +213,37 @@ def test_ai_bridge_blocks_ip_write_spam(keyed_client: TestClient) -> None:
     )
     assert blocked.status_code == 429
     assert "너무 많습니다" in blocked.json()["detail"]
+
+
+def test_english_and_japanese_riders_and_english_guide(keyed_client: TestClient) -> None:
+    start_en = keyed_client.get("/start/en")
+    assert start_en.status_code == 200
+    assert "AI Insurance Claim &amp; Coverage Assistant" in start_en.text
+    assert "credit4u.or.kr" in start_en.text
+
+    reg = keyed_client.get(
+        "/ai/register-policy",
+        params={
+            "user_id": "global_user",
+            "pin": "5678",
+            "company": "Aflac",
+            "product_name": "Accident & Hospital Indemnity",
+            "policy_type": "FIXED_BENEFIT",
+            "source_type": "POLICY_CERTIFICATE",
+            "issuer": "Aflac",
+            "issued_on": "2024-01-10",
+            "riders": "Fracture Benefit:1500|Hospital Indemnity Daily:200|骨折診断給付金:50000",
+        },
+    )
+    assert reg.status_code == 200
+    data = reg.json()
+    assert data["unresolved_riders"] == []
+    mapped = {r["rider_name"]: r["mapped_rule_id"] for r in data["policy"]["riders"]}
+    assert mapped["Fracture Benefit"] == "FRACTURE_DIAGNOSIS"
+    assert mapped["Hospital Indemnity Daily"] == "INPATIENT_DAILY"
+    assert mapped["骨折診断給付金"] == "FRACTURE_DIAGNOSIS"
+
+    snap_en = keyed_client.get("/u/global_user/5678/en")
+    assert snap_en.status_code == 200
+    assert "Live Database Snapshot for Current User" in snap_en.text
+    assert "&quot;user_id&quot;: &quot;global_user&quot;" in snap_en.text

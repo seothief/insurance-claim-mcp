@@ -107,28 +107,54 @@ def create_app(database_url: str | None = None) -> FastAPI:
 
     @app.get("/start", include_in_schema=False, response_class=HTMLResponse)
     def start_page(
+        request: Request,
+        user_id: str | None = None,
+        pin: str | None = None,
+        lang: str = "ko",
+    ) -> HTMLResponse:
+        ctx = build_user_context_json(user_id, pin, request) if (user_id and pin) else None
+        return HTMLResponse(
+            build_start_html(_resolve_base_url(request, base_url), ctx, lang=lang)
+        )
+
+    @app.get("/start/en", include_in_schema=False, response_class=HTMLResponse)
+    def start_page_en(
         request: Request, user_id: str | None = None, pin: str | None = None
     ) -> HTMLResponse:
         ctx = build_user_context_json(user_id, pin, request) if (user_id and pin) else None
-        return HTMLResponse(build_start_html(_resolve_base_url(request, base_url), ctx))
+        return HTMLResponse(
+            build_start_html(_resolve_base_url(request, base_url), ctx, lang="en")
+        )
 
     @app.get("/start.md", include_in_schema=False)
     def start_markdown(
-        request: Request, user_id: str | None = None, pin: str | None = None
+        request: Request,
+        user_id: str | None = None,
+        pin: str | None = None,
+        lang: str = "ko",
     ) -> Response:
         effective = _resolve_base_url(request, base_url)
         ctx = build_user_context_json(user_id, pin, request) if (user_id and pin) else None
         if _is_ai_html_reader(request):
-            return HTMLResponse(build_start_html(effective, ctx))
+            return HTMLResponse(build_start_html(effective, ctx, lang=lang))
         return PlainTextResponse(
-            build_start_markdown(effective, ctx), media_type="text/markdown; charset=utf-8"
+            build_start_markdown(effective, ctx, lang=lang),
+            media_type="text/markdown; charset=utf-8",
         )
 
     @app.get("/u/{user_id}/{pin}", include_in_schema=False, response_class=HTMLResponse)
-    def user_start_page(request: Request, user_id: str, pin: str) -> HTMLResponse:
+    def user_start_page(
+        request: Request, user_id: str, pin: str, lang: str = "ko"
+    ) -> HTMLResponse:
         effective = _resolve_base_url(request, base_url)
         ctx = build_user_context_json(user_id, pin, request)
-        return HTMLResponse(build_start_html(effective, ctx))
+        return HTMLResponse(build_start_html(effective, ctx, lang=lang))
+
+    @app.get("/u/{user_id}/{pin}/en", include_in_schema=False, response_class=HTMLResponse)
+    def user_start_page_en(request: Request, user_id: str, pin: str) -> HTMLResponse:
+        effective = _resolve_base_url(request, base_url)
+        ctx = build_user_context_json(user_id, pin, request)
+        return HTMLResponse(build_start_html(effective, ctx, lang="en"))
 
     app.include_router(api_router)
     app.include_router(ai_router)

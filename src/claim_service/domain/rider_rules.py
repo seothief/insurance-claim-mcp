@@ -8,6 +8,16 @@ from typing import Any
 from claim_service.domain.models import ClaimInput, CoverageRule, PolicyOut, RiderOut
 from claim_service.domain.outcome import Outcome, make_outcome
 
+_CAST_ELIGIBLE_KEYWORDS = (
+    "통깁스",
+    "석고붕대",
+    "plaster cast",
+    "orthopedic cast",
+    "full cast",
+    "ギプス",
+)
+_INJURY_SURGERY_KEYWORDS = ("수술", "surgery", "surgical", "operation", "手術")
+
 
 def evaluate_rider(
     rule: CoverageRule, policy: PolicyOut, rider: RiderOut, claim: ClaimInput
@@ -16,7 +26,9 @@ def evaluate_rider(
     cfg: dict[str, Any] = rule.rule_config
     kcd = (claim.kcd_code or "").strip().upper()
     treatment = claim.treatment_name or ""
+    treatment_lower = treatment.lower()
     treatment_text = treatment + (claim.treatment_code or "")
+    treatment_text_lower = treatment_text.lower()
     name = rider.rider_name
     amount = rider.coverage_amount
     rule_id = rule.rule_id
@@ -67,13 +79,13 @@ def evaluate_rider(
         return None
 
     if rule_id == "CAST_TREATMENT":
-        if any(ex.lower() in treatment_text.lower() for ex in cfg["exclusion_keywords"]):
+        if any(ex.lower() in treatment_text_lower for ex in cfg["exclusion_keywords"]):
             return make_outcome(
                 policy, name, rule_id, "EXCLUDED", 0,
                 "약관상 '석고붕대(통깁스)' 치료만 보장되며, '부목(반깁스)' 치료는 제외됩니다.",
             )
-        if any(code in treatment_text for code in cfg["target_edi_codes"]) or (
-            "통깁스" in treatment_text
+        if any(code in treatment_text for code in cfg["target_edi_codes"]) or any(
+            kw in treatment_text_lower for kw in _CAST_ELIGIBLE_KEYWORDS
         ):
             return make_outcome(
                 policy, name, rule_id, "ELIGIBLE", amount,
@@ -83,8 +95,8 @@ def evaluate_rider(
 
     if rule_id == "FLU_ANTIVIRAL":
         kcd_match = any(kcd.startswith(prefix) for prefix in cfg["target_kcd_prefixes"])
-        drugs_text = "".join(claim.prescribed_drugs)
-        drug_match = any(drug in drugs_text for drug in cfg["antiviral_drugs"])
+        drugs_text_lower = " ".join(claim.prescribed_drugs).lower()
+        drug_match = any(str(drug).lower() in drugs_text_lower for drug in cfg["antiviral_drugs"])
         if kcd_match or drug_match:
             return make_outcome(
                 policy, name, rule_id, "ELIGIBLE", amount,
@@ -93,7 +105,7 @@ def evaluate_rider(
         return None
 
     if rule_id == "DISEASE_SURGERY":
-        if any(keyword in treatment for keyword in cfg["target_keywords"]):
+        if any(str(keyword).lower() in treatment_lower for keyword in cfg["target_keywords"]):
             return make_outcome(
                 policy, name, rule_id, "ELIGIBLE", amount,
                 f"시술/수술 내용('{treatment}')이 질병 수술 정의에 해당합니다.",
@@ -101,7 +113,7 @@ def evaluate_rider(
         return None
 
     if rule_id == "INJURY_SURGERY":
-        if claim.is_injury and "수술" in treatment:
+        if claim.is_injury and any(kw in treatment_lower for kw in _INJURY_SURGERY_KEYWORDS):
             return make_outcome(
                 policy, name, rule_id, "ELIGIBLE", amount,
                 "상해로 인한 수술로 확인되어 지급 요건에 해당합니다.",
@@ -117,7 +129,7 @@ def evaluate_rider(
         return None
 
     if rule_id == "WOUND_SUTURE":
-        if any(keyword in treatment for keyword in cfg["target_keywords"]):
+        if any(str(keyword).lower() in treatment_lower for keyword in cfg["target_keywords"]):
             return make_outcome(
                 policy, name, rule_id, "ELIGIBLE", amount,
                 f"처치 내용('{treatment}')이 창상봉합 보장에 해당합니다.",

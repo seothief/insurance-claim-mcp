@@ -1,12 +1,97 @@
-"""Public, secret-free instructions for connecting people and AI clients."""
+"""Public, secret-free instructions for connecting people and AI clients (KO / EN)."""
 
 from __future__ import annotations
 
 import html
 
 
-def build_start_markdown(base_url: str = "", user_context_json: str | None = None) -> str:
+def build_start_markdown_en(base_url: str = "", user_context_json: str | None = None) -> str:
+    """Build the English connection guide for Expats in Korea and Global (US/JP) users."""
+    origin = base_url.strip().rstrip("/")
+    ai_prefix = f"{origin}/ai" if origin else "/ai"
+    user_url_prefix = f"{origin}/u" if origin else "/u"
+    context_block = ""
+    if user_context_json:
+        context_block = f"""
+## Live Database Snapshot for Current User
+
+The JSON below contains the user's live `profile`, registered `policies` & riders,
+and `standard_rules` fetched directly from the server database.
+- **Policy lookup questions**: Answer immediately in the user's language using `policies` below.
+- **Hospital bill / EOB evaluation**: Compare the receipt against `policies` and `standard_rules`
+  (respecting `verified: true` and `source_type: POLICY_CERTIFICATE`), explain estimated payouts
+  and required claim documents in plain language, and provide a clickable `{ai_prefix}/evaluate?...`
+  link for server verification.
+- **Registering a new policy certificate / schedule of benefits**: Show the extracted table first,
+  then provide a clickable `{ai_prefix}/register-policy?...` link so the user can save it with one
+  tap (this automatically creates the `user_id` + `pin` account if new).
+
+```json
+{user_context_json}
+```
+"""
+    return f"""# AI Insurance Claim & Coverage Assistant — Start Guide (Global & Korea Expat)
+
+This service helps users check **estimated insurance payouts and required claim documents**
+from hospital receipts / itemized bills without giving personal data (name, SSN/ARC, phone number,
+policy number) to third-party lead-generation apps or calling insurance sales agents.
+Results are informational estimates and do not guarantee claim approval.
+{context_block}
+## Instructions for the AI Assistant
+
+If the user shared this link in ChatGPT, Claude, Gemini, or an Agentic Browser AI (e.g., Aside):
+
+1. **Default Mode (No API Key, No App Install Required)**:
+   - **Never ask the user for an API key or MCP configuration.**
+   - Immediately use the **Keyless Web Bridge (`/u/*`, `/ai/*`)** below to onboard the user
+     (`user_id` + 4-digit `pin`), register their policy riders, or evaluate hospital receipts.
+2. **Supported Markets & Use Cases**:
+   - **Use Case A — Foreign Residents / Expats in Korea**:
+     - Translate and parse Korean insurance policy certificates (`보험증권`) or the official
+       **Korea Credit Information Services (`credit4u.or.kr`) > `[보험신용정보]` >**
+       **`[정액형보험]` / `[실손형보험]`** detail tables
+       (`보장구분 | 보장명 | 보장상태 | 보장금액`).
+     - If you are an **Agentic Browser AI (e.g., Aside)** and the user is logged into
+       `credit4u.or.kr`, iterate through each contract's detail table, **export a clean CSV**
+       (`Company,Product,Category,RiderName,Status,CoverageAmount`), and register them directly.
+     - When evaluating Korean hospital bills (`진료비 계산서·영수증` and `진료비 세부내역서`),
+       map `급여` (NHIS covered copay) to `cost_covered`, `비급여` (non-covered) to
+       `cost_uncovered`, and Korean `KCD` codes (identical to WHO `ICD-10`).
+   - **Use Case B — US / Japan / Global Insurance Users**:
+     - Register **US Supplemental Health / Accident / Hospital Indemnity** policies (e.g., Aflac,
+       MetLife, Cigna, Colonial Life — `Fracture Benefit`, `Hospital Indemnity / Daily Confinement`,
+       `ER Visit`, `Illness/Accident Surgery`, `Suture/Laceration`, `Burn`, `Cast`, `Flu`) or
+       **Japanese Medical/Accident policies (`医療保険・傷害保険` — `骨折`, `入院日額`,**
+       **`手術給付金`, `ギプス`, `創傷縫合`)** from a Policy Certificate / Schedule of Benefits.
+     - Evaluate Itemized Hospital Bills & EOBs using standard **ICD-10** diagnosis codes
+       (`kcd_code`), procedure/CPT descriptions (`treatment_name`), inpatient days
+       (`inpatient_days`), and covered vs. non-covered/out-of-pocket amounts.
+
+## Keyless Web Bridge Endpoints (`/u/*`, `/ai/*`)
+
+- **Single-Fetch User Snapshot (Recommended for Mobile ChatGPT / Claude / Gemini)**:
+  `{user_url_prefix}/{{user_id}}/{{pin}}/en`
+  (Opening this single URL returns the user's profile, all registered policies/riders, and rules.)
+- **Action Links (Open directly or present as a clickable Markdown link for the user to tap)**:
+  1. **Register or Update Policy (Auto-creates `user_id` + `pin` on first use)**:
+     `{ai_prefix}/register-policy?user_id={{user_id}}&pin={{pin}}&company={{Insurer}}&product_name={{PlanName}}&policy_type={{COMPREHENSIVE|SILSON|FIXED_BENEFIT|DRIVER|DENTAL|OTHER}}&source_type=POLICY_CERTIFICATE&issuer={{Insurer}}&issued_on={{YYYY-MM-DD}}&riders={{RiderName1}}:{{Amount1}}|{{RiderName2}}:{{Amount2}}`
+  2. **Resolve Ambiguous Rider**:
+     `{ai_prefix}/resolve-rider?user_id={{user_id}}&pin={{pin}}&rider_id={{rider_id}}&mapping_status={{MAPPED|IGNORED}}&mapped_rule_id={{rule_id}}`
+  3. **List Registered Policies**:
+     `{ai_prefix}/policies?user_id={{user_id}}&pin={{pin}}`
+  4. **Evaluate Hospital Bill / Receipt**:
+     `{ai_prefix}/evaluate?user_id={{user_id}}&pin={{pin}}&kcd_code={{ICD10_or_KCD}}&treatment_name={{Procedure}}&cost_covered={{CoveredAmount}}&cost_uncovered={{UncoveredAmount}}&hospital_type={{clinic|hospital|general}}&is_inpatient={{true|false}}&inpatient_days={{Days}}`
+
+- [한국어 안내 (`/start`)](/start) · [Service Intro (`/`)](/)
+"""
+
+
+def build_start_markdown(
+    base_url: str = "", user_context_json: str | None = None, lang: str = "ko"
+) -> str:
     """Build the public connection guide using the configured service domain, if available."""
+    if lang.lower().startswith("en"):
+        return build_start_markdown_en(base_url, user_context_json)
     origin = base_url.strip().rstrip("/")
     mcp_url = f"{origin}/mcp" if origin else "/mcp"
     openapi_url = f"{origin}/openapi.json" if origin else "/openapi.json"
@@ -35,7 +120,7 @@ def build_start_markdown(base_url: str = "", user_context_json: str | None = Non
 
 이 서비스는 AI가 보험 가입 정보와 병원 영수증을 바탕으로
 **예상 보험금과 필요 서류**를 안내하는 MCP 서비스입니다. 결과는 예상치이며 보험금 지급을
-확정하지 않습니다.
+확정하지 않습니다. (English Guide: [`/start/en`](/start/en))
 {context_block}
 ## AI 사용자용 안내
 
@@ -132,25 +217,35 @@ MCP 클라이언트 설정 예시 (자리표시자를 클라이언트의 비밀 
   실제 지급 여부는 보험사의 심사에 따릅니다.
 - 보험증권/영수증 이미지에서 읽은 내용을 등록·계산 전에 사용자가 확인해야 합니다.
   진료 정보는 계산 입력으로만 사용하며 저장하지 않습니다.
-- [서비스 소개](/) · [llms.txt](/llms.txt)
+- [서비스 소개](/) · [English Guide](/start/en) · [llms.txt](/llms.txt)
 """
 
 
-def build_start_html(base_url: str = "", user_context_json: str | None = None) -> str:
+def build_start_html(
+    base_url: str = "", user_context_json: str | None = None, lang: str = "ko"
+) -> str:
     """Render the Markdown guide as a minimal HTML page."""
-    markdown = html.escape(build_start_markdown(base_url, user_context_json))
+    is_en = lang.lower().startswith("en")
+    markdown = html.escape(build_start_markdown(base_url, user_context_json, lang=lang))
+    html_lang = "en" if is_en else "ko"
+    title = (
+        "AI Insurance Claim Assistant — Start Guide"
+        if is_en
+        else "보험 청구 도우미 연결 안내"
+    )
     return f"""<!doctype html>
-<html lang="ko">
+<html lang="{html_lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="사람과 AI를 위한 보험 청구 도우미 연결 안내">
-<title>보험 청구 도우미 연결 안내</title>
+<meta name="description" content="{title}">
+<title>{title}</title>
 <link rel="alternate" type="text/markdown" href="/start.md">
 </head>
 <body>
 <main>
-<p><a href="/">서비스 소개</a> · <a href="/start.md">Markdown</a></p>
+<p><a href="/">서비스 소개</a> · <a href="/start">한국어</a> ·
+<a href="/start/en">English</a> · <a href="/start.md">Markdown</a></p>
 <pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.6">{markdown}</pre>
 </main>
 </body>

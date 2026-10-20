@@ -21,6 +21,7 @@ PUBLIC_PATHS = frozenset(
         "/llms.txt",
         "/about.md",
         "/start",
+        "/start/en",
         "/start.md",
         "/robots.txt",
         "/favicon.ico",
