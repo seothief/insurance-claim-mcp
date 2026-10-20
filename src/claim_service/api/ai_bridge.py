@@ -374,8 +374,19 @@ def ai_register_policy(
     replace_riders: Annotated[bool, Query()] = False,
 ) -> PolicyRegistration:
     """Register or update a policy on a PIN-protected user account via GET query parameters."""
-    _verify_pinned_user(user_id, pin)
-    _consume_ip_write_quota(_extract_client_ip(request))
+    try:
+        _verify_pinned_user(user_id, pin)
+        _consume_ip_write_quota(_extract_client_ip(request))
+    except HTTPException as exc:
+        if exc.status_code != status.HTTP_404_NOT_FOUND:
+            raise
+        ai_onboard(
+            request=request,
+            user_id=user_id,
+            pin=pin,
+            display_alias=user_id,
+            birth_year=None,
+        )
     svc = get_service()
     existing_policies = svc.list_policies(user_id, pin=pin)
     is_update = any(
