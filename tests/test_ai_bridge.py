@@ -193,3 +193,23 @@ def test_chatgpt_user_agent_receives_html_and_robots_txt(
     assert "현재 로그인된 사용자의 실시간 DB 데이터" in single_fetch.text
     assert "&quot;user_id&quot;: &quot;gpt_user&quot;" in single_fetch.text
     assert "&quot;standard_rules&quot;" in single_fetch.text
+
+
+def test_ai_bridge_blocks_ip_write_spam(keyed_client: TestClient) -> None:
+    spam_headers = {"X-Forwarded-For": "203.0.113.77"}
+    for idx in range(20):
+        res = keyed_client.get(
+            "/ai/onboard",
+            params={"user_id": f"spam_{idx}", "pin": "1234"},
+            headers=spam_headers,
+        )
+        assert res.status_code == 200
+
+    # 21st write from the same IP within 5 minutes is blocked with 429
+    blocked = keyed_client.get(
+        "/ai/onboard",
+        params={"user_id": "spam_overflow", "pin": "1234"},
+        headers=spam_headers,
+    )
+    assert blocked.status_code == 429
+    assert "너무 많습니다" in blocked.json()["detail"]

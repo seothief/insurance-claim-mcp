@@ -109,7 +109,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     def start_page(
         request: Request, user_id: str | None = None, pin: str | None = None
     ) -> HTMLResponse:
-        ctx = build_user_context_json(user_id, pin) if (user_id and pin) else None
+        ctx = build_user_context_json(user_id, pin, request) if (user_id and pin) else None
         return HTMLResponse(build_start_html(_resolve_base_url(request, base_url), ctx))
 
     @app.get("/start.md", include_in_schema=False)
@@ -117,7 +117,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         request: Request, user_id: str | None = None, pin: str | None = None
     ) -> Response:
         effective = _resolve_base_url(request, base_url)
-        ctx = build_user_context_json(user_id, pin) if (user_id and pin) else None
+        ctx = build_user_context_json(user_id, pin, request) if (user_id and pin) else None
         if _is_ai_html_reader(request):
             return HTMLResponse(build_start_html(effective, ctx))
         return PlainTextResponse(
@@ -127,7 +127,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     @app.get("/u/{user_id}/{pin}", include_in_schema=False, response_class=HTMLResponse)
     def user_start_page(request: Request, user_id: str, pin: str) -> HTMLResponse:
         effective = _resolve_base_url(request, base_url)
-        ctx = build_user_context_json(user_id, pin)
+        ctx = build_user_context_json(user_id, pin, request)
         return HTMLResponse(build_start_html(effective, ctx))
 
     app.include_router(api_router)

@@ -138,14 +138,59 @@ class _AiBridgeRoute(APIRoute):
 router = APIRouter(prefix="/ai", include_in_schema=False, route_class=_AiBridgeRoute)
 
 MAX_FAILED_ATTEMPTS = 5
+MAX_WRITES_PER_IP_WINDOW = 20
+MAX_NEW_USERS_PER_WINDOW = 60
+MAX_POLICIES_PER_USER = 20
 LOCKOUT_SECONDS = 300.0
 _failed_attempts: dict[str, tuple[int, float]] = {}
+_ip_writes: dict[str, tuple[int, float]] = {}
+_global_new_users: list[float] = []
 _RIDER_SPLIT_RE = re.compile(r"[|;]|\s*,\s*(?=[^0-9])")
 
 
 def reset_rate_limits() -> None:
-    """Clear in-memory failed PIN counters (used by tests)."""
+    """Clear in-memory failed PIN and write rate-limit counters (used by tests)."""
     _failed_attempts.clear()
+    _ip_writes.clear()
+    _global_new_users.clear()
+
+
+def _extract_client_ip(request: Request | None) -> str:
+    if request is None:
+        return "unknown"
+    forwarded = (request.headers.get("x-forwarded-for") or "").strip()
+    if forwarded:
+        return forwarded.split(",")[0].strip() or "unknown"
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def _consume_ip_write_quota(client_ip: str) -> None:
+    now = time.monotonic()
+    entry = _ip_writes.get(client_ip)
+    if entry is None or now - entry[1] > LOCKOUT_SECONDS:
+        _ip_writes[client_ip] = (1, now)
+        return
+    count, first_ts = entry
+    if count >= MAX_WRITES_PER_IP_WINDOW:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="단시간 내 등록/수정 요청이 너무 많습니다. 5분 후 다시 시도해 주세요.",
+        )
+    _ip_writes[client_ip] = (count + 1, first_ts)
+
+
+def _consume_new_user_quota(client_ip: str) -> None:
+    _consume_ip_write_quota(client_ip)
+    now = time.monotonic()
+    _global_new_users[:] = [ts for ts in _global_new_users if now - ts <= LOCKOUT_SECONDS]
+    if len(_global_new_users) >= MAX_NEW_USERS_PER_WINDOW:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="신규 계정 생성 요청이 일시적으로 많습니다. 잠시 후 다시 시도해 주세요.",
+        )
+    _global_new_users.append(now)
 
 
 def _check_lockout(user_id: str) -> None:
@@ -275,6 +320,7 @@ def ai_guide() -> dict[str, object]:
 
 @router.get("/onboard", response_model=UserProfile)
 def ai_onboard(
+    request: Request,
     user_id: str = Query(..., pattern=r"^[A-Za-z0-9_-]{1,64}$"),
     pin: str = Query(..., min_length=4, max_length=32),
     display_alias: str | None = Query(default=None, max_length=100),
@@ -294,6 +340,7 @@ def ai_onboard(
         _clear_failures(user_id)
         return profile
     except NotFoundError:
+        _consume_new_user_quota(_extract_client_ip(request))
         user_in = UserIn(
             user_id=user_id,
             pin=pin,
@@ -312,6 +359,7 @@ def ai_onboard(
 
 @router.get("/register-policy", response_model=PolicyRegistration)
 def ai_register_policy(
+    request: Request,
     user_id: Annotated[str, Query(pattern=r"^[A-Za-z0-9_-]{1,64}$")],
     pin: Annotated[str, Query(min_length=4, max_length=32)],
     company: Annotated[str, Query(min_length=1, max_length=100)],
@@ -327,6 +375,17 @@ def ai_register_policy(
 ) -> PolicyRegistration:
     """Register or update a policy on a PIN-protected user account via GET query parameters."""
     _verify_pinned_user(user_id, pin)
+    _consume_ip_write_quota(_extract_client_ip(request))
+    svc = get_service()
+    existing_policies = svc.list_policies(user_id, pin=pin)
+    is_update = any(
+        p.company == company and p.product_name == product_name for p in existing_policies
+    )
+    if not is_update and len(existing_policies) >= MAX_POLICIES_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"계정당 최대 {MAX_POLICIES_PER_USER}개의 보험까지만 등록할 수 있습니다.",
+        )
     parsed_riders = _parse_riders(riders, source_type, issuer, issued_on)
     policy_in = PolicyIn(
         company=company,
@@ -341,13 +400,14 @@ def ai_register_policy(
         issued_on=issued_on,
     )
     try:
-        return get_service().register_policy(user_id, policy_in, pin=pin)
+        return svc.register_policy(user_id, policy_in, pin=pin)
     except DomainError as exc:
         raise _raise_ai_http(user_id, exc) from exc
 
 
 @router.get("/resolve-rider", response_model=RiderOut)
 def ai_resolve_rider(
+    request: Request,
     user_id: Annotated[str, Query(pattern=r"^[A-Za-z0-9_-]{1,64}$")],
     pin: Annotated[str, Query(min_length=4, max_length=32)],
     rider_id: Annotated[str, Query(min_length=1)],
@@ -357,6 +417,7 @@ def ai_resolve_rider(
 ) -> RiderOut:
     """Confirm an unresolved rider mapping via GET query parameters."""
     _verify_pinned_user(user_id, pin)
+    _consume_ip_write_quota(_extract_client_ip(request))
     body = RiderResolve(
         mapping_status=mapping_status,
         mapped_rule_id=mapped_rule_id,
@@ -383,12 +444,14 @@ def ai_list_policies(
 
 @router.get("/delete-policy")
 def ai_delete_policy(
+    request: Request,
     user_id: str = Query(..., pattern=r"^[A-Za-z0-9_-]{1,64}$"),
     pin: str = Query(..., min_length=4, max_length=32),
     policy_id: str = Query(..., min_length=1),
 ) -> dict[str, bool]:
     """Delete a policy for a PIN-protected user."""
     _verify_pinned_user(user_id, pin)
+    _consume_ip_write_quota(_extract_client_ip(request))
     try:
         deleted = get_service().delete_policy(user_id, policy_id, pin=pin)
     except DomainError as exc:
@@ -444,7 +507,9 @@ def ai_evaluate_claim(
         raise _raise_ai_http(user_id, exc) from exc
 
 
-def build_user_context_json(user_id: str, pin: str) -> str:
+def build_user_context_json(
+    user_id: str, pin: str, request: Request | None = None
+) -> str:
     """Build a single-fetch JSON snapshot (profile + policies + rules) for `/u/{user_id}/{pin}`."""
     if not re.match(r"^[A-Za-z0-9_-]{1,64}$", user_id) or not (4 <= len(pin) <= 32):
         return json.dumps(
@@ -457,7 +522,13 @@ def build_user_context_json(user_id: str, pin: str) -> str:
             indent=2,
         )
     try:
-        profile = ai_onboard(user_id=user_id, pin=pin, display_alias=user_id, birth_year=None)
+        profile = ai_onboard(
+            request=cast(Request, request),
+            user_id=user_id,
+            pin=pin,
+            display_alias=user_id,
+            birth_year=None,
+        )
         policies = get_service().list_policies(user_id, pin=pin)
         rules = list(get_service().rules().values())
         return json.dumps(
