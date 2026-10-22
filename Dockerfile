@@ -1,4 +1,4 @@
-# Production image for the claim service (FastAPI REST + MCP over streamable HTTP).
+# Production image for the claim service (MCP over Streamable HTTP).
 # Works on Cloud Run (honours $PORT) and locally via docker compose.
 FROM python:3.12-slim AS base
 

@@ -5,8 +5,8 @@
 - `main`에 대한 CI가 성공하면 배포 워크플로가 자동 실행됩니다.
 - Actions의 **Deploy to Cloud Run → Run workflow**에서 `main`을 선택하면 한 번 실행으로 수동 배포할 수 있습니다.
 - 배포는 `main`만 허용하고, 이미지 태그는 해당 커밋 SHA입니다.
-- 빌드·배포 후 `/api/health`, `/api/version`, `/llms.txt`를 검사합니다.
-- `APP_VERSION`, `SEED_SAMPLE_DATA=false`, `PUBLIC_BASE_URL`은 최신 배포값으로 갱신합니다. DATABASE_URL/API_KEY Secret 연결은 최신 버전을 유지하며 그 밖의 기존 서비스 설정은 보존합니다.
+- 빌드·배포 후 `/api/health`, `/api/version`을 검사합니다. 이 경로는 Cloud Run 운영 상태 확인용이며 인증 없이 접근할 수 있습니다.
+- `APP_VERSION`은 최신 배포값으로 갱신합니다. DATABASE_URL/API_KEY Secret 연결은 최신 버전을 유지하며 그 밖의 기존 서비스 설정은 보존합니다.
 
 ## GitHub 저장소 설정
 

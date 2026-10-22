@@ -1,15 +1,15 @@
-"""Process-wide service instance shared by the REST API and MCP tools."""
+"""Process-wide service instance used by MCP tools."""
 
 from claim_service.config import get_settings
 from claim_service.db.engine import create_db_engine, init_schema
 from claim_service.db.repository import PolicyRepository
-from claim_service.db.seed import seed_sample_user, seed_standard_rules
+from claim_service.db.seed import seed_standard_rules
 from claim_service.service import PolicyService
 
 _service: PolicyService | None = None
 
 
-def init_runtime(database_url: str | None = None, seed: bool | None = None) -> PolicyService:
+def init_runtime(database_url: str | None = None) -> PolicyService:
     """Create the engine, schema and service once. Later calls replace the instance."""
     global _service
     settings = get_settings()
@@ -17,10 +17,7 @@ def init_runtime(database_url: str | None = None, seed: bool | None = None) -> P
     init_schema(engine)
     repo = PolicyRepository(engine)
     service = PolicyService(repo)
-    should_seed = settings.seed_sample_data if seed is None else seed
     seed_standard_rules(repo)
-    if should_seed:
-        seed_sample_user(repo, service)
     _service = service
     return service
 

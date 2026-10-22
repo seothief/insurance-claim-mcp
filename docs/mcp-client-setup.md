@@ -1,52 +1,14 @@
-# AI 클라이언트(Gemini, Claude, Cline, ChatGPT) 연결 가이드
+# MCP 클라이언트 연결 가이드
 
-처음 연결할 때는 서비스의 공개 [시작 안내](/start) 또는 [Markdown 안내](/start.md)를
-참고하세요. 공개 안내에는 공용 API 키가 포함되지 않습니다. 아래 상세 설정도 키를
-`<서버 공용 API_KEY>` 자리표시자로 나타내며, 실제 값은 운영자가 신뢰할 수 있는 별도 비밀
-전달 경로로 제공해야 합니다.
+이 서비스의 보험 업무 인터페이스는 MCP입니다. REST 업무 API, OpenAPI 스키마, 웹 안내 페이지 및 Custom GPT Actions는 제공하지 않습니다.
 
-이 서비스는 별도의 사용자 UI를 두지 않고 **`사용자 ↔ AI ↔ 서비스(MCP / OpenAPI)`** 구조로 동작합니다.
-사용자는 자신이 구독 중인 AI와 대화하며 보험 화면 캡처나 병원 영수증 사진을 올리고, AI가 직접 서버 도구를 호출합니다.
+## 원격 Streamable HTTP 연결
 
-## 공통 접속 정보
-- **서버 기본 주소**: `https://insurance-claim-mcp-878600435547.asia-northeast3.run.app`
-- **MCP 엔드포인트 (Streamable HTTP)**: `https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/mcp` (`/mcp`와 `/mcp/` 모두 동작)
-- **OpenAPI 스키마 주소**: `https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/openapi.json`
-- **인증 헤더**: `X-API-Key: <서버 API_KEY>` 또는 `Authorization: Bearer <서버 API_KEY>`
-  (클라우드 배포 환경에서는 GCP Secret Manager의 `API_KEY` 시크릿으로 주입)
+- MCP URL: `https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/mcp`
+- 인증 헤더: `X-API-Key: <서버 운영자가 안전하게 전달한 공용 키>`
+- 선택 헤더: `X-User-Id: <내 별명>`으로 도구 요청을 특정 사용자에 연결합니다. 이 값은 인증을 대체하지 않습니다.
 
-모든 요청에는 서버 공용 `X-API-Key`가 필요합니다. 사용자 데이터가 필요한 AI 클라이언트는 본인의 `X-User-Id`를 설정해 해당 별명에 요청을 귀속시킬 수 있습니다. 사용자 ID는 인증 수단이 아니며, 이를 통해 PIN 보호가 해제되지 않습니다. PIN 보호 계정은 `X-User-Pin` 또는 도구의 PIN 입력도 필요합니다.
-
----
-
-## 1. Google Gemini CLI (`@google/gemini-cli`) 연결
-
-1. 설치 및 구글 계정 로그인 (Google AI Plus 계정 사용 가능):
-   ```powershell
-   npm.cmd install -g @google/gemini-cli
-   gemini
-   ```
-2. 설정 파일(`C:\Users\<사용자>\.gemini\settings.json`)에 MCP 서버 등록:
-   ```json
-   {
-     "mcpServers": {
-       "insurance-claim": {
-         "httpUrl": "https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/mcp",
-         "headers": {
-             "X-API-Key": "<서버 공용 API_KEY>",
-             "X-User-Id": "<내 별명>"
-         }
-       }
-     }
-   }
-   ```
-3. 대화 시작 후 보험 캡처 이미지나 영수증 사진을 전달하면 Gemini가 자동으로 도구를 호출합니다.
-
----
-
-## 2. Cline / Cursor / Windsurf / Claude Desktop 연결
-
-MCP 설정 JSON(예: Cline의 `cline_mcp_settings.json`)에 아래 항목을 추가합니다:
+클라이언트가 Streamable HTTP와 사용자 정의 헤더를 지원하면 아래와 같이 등록합니다. 실제 키는 클라이언트의 비밀 설정에 저장하고 설정 예시·대화·로그에 넣지 마세요.
 
 ```json
 {
@@ -55,55 +17,34 @@ MCP 설정 JSON(예: Cline의 `cline_mcp_settings.json`)에 아래 항목을 추
       "url": "https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/mcp",
       "type": "streamableHttp",
       "headers": {
-        "X-API-Key": "<서버 공용 API_KEY>",
-        "X-User-Id": "<내 별명>"
-      },
-      "disabled": false,
-      "autoApprove": [
-        "get_onboarding_guide",
-        "get_user_profile",
-        "list_standard_rules",
-        "list_user_policies",
-        "evaluate_claim"
-      ]
-    }
-  }
-}
-```
-- 조회·계산 도구는 `autoApprove`에 넣어 즉시 실행되게 하고, 데이터를 변경하는 `register_user`, `register_user_policy`, `resolve_user_rider`, `delete_user_policy`는 AI가 사용자에게 확인한 뒤 호출하게 합니다.
-
----
-
-## 3. Antigravity 연결 (`mcp_config.json`)
-
-Antigravity의 MCP 설정 파일(`C:\Users\<사용자>\.gemini\config\mcp_config.json`)에 Cloud Run 원격 서버를 등록합니다:
-
-```json
-{
-  "mcpServers": {
-    "insurance-claim": {
-      "serverUrl": "https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/mcp",
-      "headers": {
-        "X-API-Key": "<서버 공용 API_KEY>",
+        "X-API-Key": "${INSURANCE_CLAIM_API_KEY}",
         "X-User-Id": "<내 별명>"
       }
     }
   }
 }
 ```
-- PIN 보호 계정이면 본인 전용 설정의 `"headers"`에 `"X-User-Pin": "<내 PIN>"`도 추가합니다. 공용 `X-API-Key`는 서버 접근 인증이며 사용자별 인증이 아니므로 안전하게 보호하세요.
 
+클라이언트에서 환경변수 치환을 지원하지 않으면 해당 제품의 보호된 비밀 저장소를 사용하세요. PIN 보호 계정은 PIN을 공용 헤더나 설정 파일에 저장하지 말고 필요한 MCP 도구 호출에만 입력합니다.
 
----
+## 로컬 stdio 연결
 
-## 4. ChatGPT (Custom GPT Actions) 연결
-- `docs/chatgpt-custom-gpt-guide.md` 문서를 참고해 `https://insurance-claim-mcp-878600435547.asia-northeast3.run.app/openapi.json`을 불러오고 `X-API-Key` 헤더를 설정합니다.
+저장소 루트에서 가상 환경을 만들고 의존성을 설치한 뒤 MCP 서버를 실행합니다.
 
----
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt
+.\.venv\Scripts\python.exe -m claim_service.mcp.server
+```
 
-## 5. AI가 따르는 표준 대화 흐름 (서버 내장 지침)
-서버의 MCP `instructions` 및 `insurance_assistant_prompt`에 아래 순서가 내장되어 있습니다:
-1. **별명 확인 (`get_user_profile` → 없으면 `register_user`)**
-2. **보험 등록 (`register_user_policy`)**: 이미지에서 읽은 보험사·상품명·특약·금액을 사용자에게 먼저 보여주고 확인받은 뒤 호출 (휴먼 에러 및 OCR 오류 방지)
-3. **애매한 특약 재질의 (`resolve_user_rider`)**: `unresolved_riders`가 반환되면 증권을 다시 확인하거나 사용자에게 물어 `MAPPED` / `CUSTOM` / `IGNORED`로 확정
-4. **영수증 계산 (`evaluate_claim`)**: 급여/비급여/질병코드/처치명을 읽어 예상 보험금과 필요 서류 안내 (모든 약관 수치는 `verified: false`이므로 예상치로만 안내)
+클라이언트의 stdio MCP 설정에는 실행 파일로 `.venv\Scripts\python.exe`, 인자로 `-m`, `claim_service.mcp.server`를 지정하고 `PYTHONPATH`에 저장소의 `src` 디렉터리를 설정합니다. 클라이언트의 환경변수 전달 기능으로 `DATABASE_URL`을 설정하세요. stdio 연결에는 HTTP API 키 인증이 적용되지 않습니다.
+
+## 안전한 사용 흐름
+
+1. 서비스 안내 및 시작 절차는 MCP `get_onboarding_guide` 또는 `insurance://guide/onboarding`으로 확인합니다.
+2. 사용자 데이터가 필요하면 사용자 본인의 별명과 PIN을 확인하고 MCP 도구를 사용합니다.
+3. 보험 등록·갱신·특약 변경·삭제 전에는 변경 내용을 사용자에게 보여주고 명시적으로 확인받습니다.
+4. 청구 평가 결과는 정보 제공용 예상치이며 보험사의 지급 여부나 금액을 확정하지 않습니다. 미검증 규칙은 추측해 계산하지 않습니다.
+5. 서버 키, PIN, 주민등록번호, 증권번호, 계좌번호를 대화·로그에 남기지 않습니다.
+
+서버 도구·리소스·프롬프트가 이 문서와 다르면 연결된 MCP 서버가 제공하는 최신 설명을 우선합니다.

@@ -1,7 +1,7 @@
-"""Optional API-key guard for the REST and MCP endpoints.
+"""Optional API-key guard for the MCP HTTP endpoint.
 
 Enabled only when the API_KEY environment variable is set. Health and version endpoints stay open
-so that container and cloud health checks work without credentials.
+so container and cloud health checks work without credentials.
 """
 
 import hmac
@@ -10,21 +10,10 @@ from typing import Any
 
 from claim_service.domain.security import set_request_identity
 
-# /openapi.json describes the API shape only (no user data). ChatGPT Actions must fetch it
-# without credentials when a GPT is configured. The intro pages are static, secret-free text.
 PUBLIC_PATHS = frozenset(
     {
         "/api/health",
         "/api/version",
-        "/openapi.json",
-        "/",
-        "/llms.txt",
-        "/about.md",
-        "/start",
-        "/start/en",
-        "/start.md",
-        "/robots.txt",
-        "/favicon.ico",
     }
 )
 Scope = MutableMapping[str, Any]
@@ -71,7 +60,7 @@ class ApiKeyMiddleware:
         if scope.get("path") == "/mcp":
             scope["path"] = "/mcp/"
         path = str(scope.get("path") or "")
-        if path in PUBLIC_PATHS or path.startswith(("/ai/", "/u/")):
+        if path in PUBLIC_PATHS:
             await self._app(scope, receive, send)
             return
         provided, requested_user, header_pin = _extract_headers(scope.get("headers", []))

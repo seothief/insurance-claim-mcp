@@ -40,11 +40,6 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v2
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "${{ vars.GCP_REGION }}-docker.pkg.dev" --quiet
-      - name: Resolve Cloud Run URL
-        run: |
-          url=$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" --format 'value(status.url)')
-          test -n "$url"
-          echo "PUBLIC_BASE_URL=$url" >> "$GITHUB_ENV"
       - name: Build and push image
         run: |
           docker build -t "$IMAGE" .
@@ -56,13 +51,14 @@ jobs:
             --region "$REGION" \
             --project "$PROJECT_ID" \
             --platform managed \
-            --update-env-vars "APP_VERSION=${IMAGE##*:},SEED_SAMPLE_DATA=false,PUBLIC_BASE_URL=$PUBLIC_BASE_URL" \
+            --update-env-vars "APP_VERSION=${IMAGE##*:}" \
             --update-secrets "DATABASE_URL=DATABASE_URL:latest,API_KEY=API_KEY:latest"
       - name: Verify deployment
         run: |
           set -euo pipefail
-          curl --retry 12 --retry-delay 5 --retry-connrefused -fsS "$PUBLIC_BASE_URL/api/health" | python3 -c 'import json,sys; assert json.load(sys.stdin)["status"] == "ok"'
-          curl -fsS "$PUBLIC_BASE_URL/api/version" | python3 -c 'import json,sys,os; assert json.load(sys.stdin)["version"] == os.environ["EXPECTED_VERSION"]'
-          curl -fsS "$PUBLIC_BASE_URL/llms.txt" > /dev/null
+          url=$(gcloud run services describe "$SERVICE" --region "$REGION" --project "$PROJECT_ID" --format 'value(status.url)')
+          test -n "$url"
+          curl --retry 12 --retry-delay 5 --retry-connrefused -fsS "$url/api/health" | python3 -c 'import json,sys; assert json.load(sys.stdin)["status"] == "ok"'
+          curl -fsS "$url/api/version" | python3 -c 'import json,sys,os; assert json.load(sys.stdin)["version"] == os.environ["EXPECTED_VERSION"]'
         env:
           EXPECTED_VERSION: ${{ github.event.workflow_run.head_sha || github.sha }}

@@ -33,10 +33,9 @@ def fresh_external_schema() -> Iterator[None]:
 
 @pytest.fixture
 def client(
-    tmp_path: Path, fresh_external_schema: None, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, fresh_external_schema: None
 ) -> Iterator[TestClient]:
-    """REST/MCP test client bound to a fresh database (SQLite by default, PostgreSQL in CI)."""
-    monkeypatch.setenv("SEED_SAMPLE_DATA", "true")
+    """MCP HTTP test client bound to a fresh database (SQLite or PostgreSQL)."""
     get_settings.cache_clear()
     with TestClient(create_app(database_url_for(tmp_path, "test.db"))) as test_client:
         yield test_client

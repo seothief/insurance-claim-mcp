@@ -1,7 +1,7 @@
 [project]
 name = "insurance-claim-mcp"
 version = "0.1.0"
-description = "FastAPI + MCP service that matches medical receipts against insurance policies (informational estimates only)."
+description = "MCP service that matches medical receipts against insurance policies (informational estimates only)."
 requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.143.1",
