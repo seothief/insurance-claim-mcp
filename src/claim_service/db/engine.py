@@ -70,3 +70,32 @@ def init_schema(engine: Engine) -> None:
             conn.execute(text("ALTER TABLE user_policy_riders ADD COLUMN issuer VARCHAR(100)"))
         if "issued_on" not in rider_columns:
             conn.execute(text("ALTER TABLE user_policy_riders ADD COLUMN issued_on VARCHAR(10)"))
+    with engine.begin() as conn:
+        dialect = conn.dialect.name
+        timestamp_type = "TIMESTAMP WITH TIME ZONE" if dialect == "postgresql" else "TIMESTAMP"
+        key_columns = {col["name"] for col in inspect(conn).get_columns("user_api_keys")}
+        # A legacy per-user key table (removed 2026-10-17) used `token_hash` and had no
+        # prefix/lifecycle columns. Migrate in place instead of dropping stored keys.
+        if "token_hash" in key_columns and "key_hash" not in key_columns:
+            conn.execute(
+                text("ALTER TABLE user_api_keys RENAME COLUMN token_hash TO key_hash")
+            )
+            key_columns.discard("token_hash")
+            key_columns.add("key_hash")
+        if "key_prefix" not in key_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE user_api_keys "
+                    "ADD COLUMN key_prefix VARCHAR(16) NOT NULL DEFAULT ''"
+                )
+            )
+        if "note" not in key_columns:
+            conn.execute(text("ALTER TABLE user_api_keys ADD COLUMN note VARCHAR(200)"))
+        if "last_used_at" not in key_columns:
+            conn.execute(
+                text(f"ALTER TABLE user_api_keys ADD COLUMN last_used_at {timestamp_type}")
+            )
+        if "revoked_at" not in key_columns:
+            conn.execute(
+                text(f"ALTER TABLE user_api_keys ADD COLUMN revoked_at {timestamp_type}")
+            )
