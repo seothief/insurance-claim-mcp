@@ -8,10 +8,20 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from sqlalchemy import Connection, Engine, RowMapping, delete, func, insert, select, update
+from sqlalchemy import (
+    Connection,
+    Engine,
+    RowMapping,
+    delete,
+    func,
+    insert,
+    select,
+    update,
+)
 
 from claim_service.db.tables import (
     coverage_rules,
+    kcd_codes,
     user_api_keys,
     user_policies,
     user_policy_riders,
@@ -87,6 +97,41 @@ class PolicyRepository:
             )
             for row in rows
         }
+
+    # ---- KCD official code master ---------------------------------------
+    def upsert_kcd_codes(self, codes: Iterable[dict[str, object]]) -> int:
+        """Insert or replace rows in the KCD code master. Returns the row count written."""
+        written = 0
+        with self._engine.begin() as conn:
+            for row in codes:
+                code = str(row["code"])
+                values = {
+                    key: row[key]
+                    for key in kcd_codes.c.keys()
+                    if key in row and key != "code"
+                }
+                exists = conn.execute(
+                    select(kcd_codes.c.code).where(kcd_codes.c.code == code)
+                ).first()
+                if exists is None:
+                    conn.execute(insert(kcd_codes).values(code=code, **values))
+                else:
+                    conn.execute(
+                        update(kcd_codes).where(kcd_codes.c.code == code).values(**values)
+                    )
+                written += 1
+        return written
+
+    def get_kcd_codes(self) -> dict[str, dict[str, object]]:
+        """Return the full KCD master keyed by code."""
+        with self._engine.connect() as conn:
+            rows = conn.execute(select(kcd_codes)).mappings().all()
+        return {str(row["code"]): dict(row) for row in rows}
+
+    def count_kcd_codes(self) -> int:
+        with self._engine.connect() as conn:
+            count = conn.execute(select(func.count()).select_from(kcd_codes)).scalar()
+        return int(count or 0)
 
     # ---- users ----------------------------------------------------------
     def create_user(self, user: UserIn, pin_hash: str | None = None) -> bool:

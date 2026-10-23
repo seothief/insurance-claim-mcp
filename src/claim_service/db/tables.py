@@ -30,6 +30,22 @@ coverage_rules = Table(
     Column("source_reference", Text, nullable=False),
 )
 
+# KCD (한국표준질병·사인분류) 공식 코드 마스터.
+# 통계청 표준분류/KOICD 또는 HIRA 상병마스터 원본에서 적재한다. 계산의 "공통 언어"로만 쓰이고,
+# 어떤 특약이 어떤 코드 범위를 보장하는지는 개별 약관(coverage_rules/user_policy_riders)이 결정한다.
+kcd_codes = Table(
+    "kcd_codes",
+    metadata,
+    Column("code", String(10), primary_key=True),
+    Column("category", String(1), nullable=False),  # 대분류 A~Z (예: S=손상, T=외인)
+    Column("level", Integer, nullable=False),       # 1=대분류 2=중 3=소 4=세 5=세세
+    Column("ko_name", String(500), nullable=False),
+    Column("en_name", String(500), nullable=True),
+    Column("source_version", String(20), nullable=False),  # 예: KCD-8, KCD-9
+    Column("verified", Boolean, nullable=False, default=True),  # 공식 출처 코드는 True
+    Column("source_reference", Text, nullable=False),
+)
+
 users = Table(
     "users",
     metadata,
