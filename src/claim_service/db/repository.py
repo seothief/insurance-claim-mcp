@@ -8,15 +8,16 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from sqlalchemy import Connection, Engine, RowMapping, delete, insert, select, update
+from sqlalchemy import Connection, Engine, RowMapping, delete, func, insert, select, update
 
 from claim_service.db.tables import (
     coverage_rules,
+    user_api_keys,
     user_policies,
     user_policy_riders,
     users,
 )
-from claim_service.domain.errors import DuplicateRiderError
+from claim_service.domain.errors import DuplicateRiderError, NotFoundError
 from claim_service.domain.models import CoverageRule, MappingStatus, PolicyOut, RiderOut, UserIn
 
 
@@ -128,6 +129,58 @@ class PolicyRepository:
 
     def user_exists(self, user_id: str) -> bool:
         return self.get_user(user_id) is not None
+
+    # ---- per-user API keys ---------------------------------------------
+    def create_api_key(self, user_id: str, key_hash: str, key_prefix: str) -> str:
+        """Store a new per-user API key hash and return its key_id."""
+        if not self.user_exists(user_id):
+            raise NotFoundError(f"사용자를 찾을 수 없습니다: {user_id}")
+        key_id = str(uuid.uuid4())
+        with self._engine.begin() as conn:
+            conn.execute(
+                insert(user_api_keys).values(
+                    key_id=key_id,
+                    user_id=user_id,
+                    key_hash=key_hash,
+                    key_prefix=key_prefix,
+                )
+            )
+        return key_id
+
+    def find_active_key_owner(self, key_hash: str) -> str | None:
+        """Return the user_id owning an active API key with this hash, or None."""
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                select(user_api_keys.c.user_id)
+                .where(user_api_keys.c.key_hash == key_hash)
+                .where(user_api_keys.c.revoked_at.is_(None))
+            ).mappings().first()
+        return None if row is None else str(row["user_id"])
+
+    def list_api_keys(self, user_id: str) -> list[dict[str, Any]]:
+        """Return the user's API key rows (never the hash or the raw key)."""
+        with self._engine.connect() as conn:
+            rows = conn.execute(
+                select(
+                    user_api_keys.c.key_id,
+                    user_api_keys.c.key_prefix,
+                    user_api_keys.c.revoked_at,
+                )
+                .where(user_api_keys.c.user_id == user_id)
+                .order_by(user_api_keys.c.created_at)
+            ).mappings().all()
+        return [dict(row) for row in rows]
+
+    def revoke_api_key(self, user_id: str, key_id: str) -> bool:
+        """Mark a key as revoked. Returns False when the key does not exist or has no owner."""
+        with self._engine.begin() as conn:
+            result = conn.execute(
+                update(user_api_keys)
+                .where(user_api_keys.c.key_id == key_id)
+                .where(user_api_keys.c.user_id == user_id)
+                .values(revoked_at=func.now())
+            )
+            return result.rowcount > 0
 
     # ---- policies -------------------------------------------------------
     def list_policies(self, user_id: str) -> list[PolicyOut]:

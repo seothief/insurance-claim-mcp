@@ -1,6 +1,19 @@
 # 진행 현황
 
-최종 갱신: 2026-10-22
+최종 갱신: 2026-10-23
+
+## 최신 진행 상황 (2026-10-23)
+
+- **인증 방식 전환(사용자별 전용 키)**: 공용 `API_KEY` 인증을 제거하고, 사용자별 키(`X-User-Key` 또는 `Bearer`)로 MCP HTTP를 인증하도록 변경함. 유효한 키는 요청을 소유 사용자에게 귀속시키고 해당 계정의 PIN 입력을 대체함.
+- DB: `user_api_keys` 테이블(`key_id`, `user_id`, `key_hash` SHA-256, `key_prefix`, `note`, `created_at`, `last_used_at`, `revoked_at`) 추가. 원문 키는 발급 시 1회만 표시하고 서버에는 SHA-256 해시만 저장함.
+- 운영자 CLI: `scripts/manage_user_keys.py`의 `issue`/`list`/`revoke`. `list`는 key_id·prefix·상태(사용 중/폐기됨)만 표시하며 원문·해시는 노출하지 않음.
+- 공용 키 회전 도구 정리: `scripts/rotate_api_key.py`, `tests/test_rotate_api_key.py`, `docs/api-key-rotation.md` 제거. `docs/user-api-keys.md` 신규 추가.
+- 배포/로컬 설정: `.github/workflows/deploy-cloudrun.yml`에서 `API_KEY` Secret 주입 제거, `docker-compose.yml`에서 `API_KEY` 환경변수 제거. `config.py`의 `api_key` 설정 제거.
+- 문서 갱신: `README.md`, `docs/mcp-client-setup.md`, `docs/agent-connect-prompt.md`, `docs/deployment.md`.
+- 테스트: `tests/test_user_api_keys.py` 신규(해시만 저장, 키→소유자 해석, PIN 대체, 폐기, 목록 비노출, 미존재 사용자 발급 거부). `tests/test_deploy.py`를 사용자 키 인증 기준으로 재작성.
+- **검증(실행 결과)**: `pytest -q` 43 passed, `ruff check src tests scripts` 통과, `mypy src` 26개 파일 통과. 운영자 CLI는 임시 SQLite에서 발급→목록→폐기→상태 표시를 실제 실행해 확인함.
+- 브랜치: `feat/per-user-api-keys-v2`.
+- 로컬 환경 참고: 프로젝트 `.venv`가 pip 없이 생성되어(`pip._vendor` 누락) 사용할 수 없어, 시스템 파이썬(`C:\Python312`, pip 26.2, 사용자 site-packages)에 잠금 의존성을 설치해 검증함. 운영 배포는 실행하지 않음.
 
 ## 최신 진행 상황 (2026-10-22)
 

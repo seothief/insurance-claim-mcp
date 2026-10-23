@@ -1,14 +1,22 @@
-"""Optional API-key guard for the MCP HTTP endpoint.
+"""Per-user API-key guard for the MCP HTTP endpoint.
 
-Enabled only when the API_KEY environment variable is set. Health and version endpoints stay open
-so container and cloud health checks work without credentials.
+Every protected request must present a per-user key in the `X-User-Key` header. The raw key is
+never stored or logged; only its SHA-256 hash is looked up in the database. A valid key binds the
+request to its owner (replacing PIN entry for that account) and rejects any other `X-User-Id`.
+Health and version endpoints stay open so container and cloud health checks work without
+credentials.
 """
 
-import hmac
 from collections.abc import Awaitable, Callable, MutableMapping
 from typing import Any
 
-from claim_service.domain.security import set_request_identity
+from starlette.concurrency import run_in_threadpool
+
+from claim_service.domain.security import (
+    set_key_authenticated_user,
+    set_request_identity,
+)
+from claim_service.runtime import get_service
 
 PUBLIC_PATHS = frozenset(
     {
@@ -26,30 +34,32 @@ ASGIApp = Callable[[Scope, Receive, Send], Awaitable[None]]
 def _extract_headers(
     headers: list[tuple[bytes, bytes]],
 ) -> tuple[str, str | None, str | None]:
-    api_key = ""
+    user_key = ""
     bound_user: str | None = None
     header_pin: str | None = None
     for name, value in headers:
         lowered = name.lower()
-        if lowered == b"x-api-key":
-            api_key = value.decode("latin-1")
+        if lowered == b"x-user-key":
+            user_key = value.decode("latin-1")
         elif lowered == b"authorization":
             text = value.decode("latin-1")
             if text.lower().startswith("bearer "):
-                api_key = text[7:].strip()
+                user_key = text[7:].strip()
         elif lowered == b"x-user-id":
             bound_user = value.decode("latin-1").strip() or None
         elif lowered == b"x-user-pin":
             header_pin = value.decode("latin-1").strip() or None
-    return api_key, bound_user, header_pin
+    return user_key, bound_user, header_pin
 
 
 class ApiKeyMiddleware:
-    """Reject HTTP requests without the configured key. Other scope types pass through."""
+    """Resolve the X-User-Key to its owner and bind the request to that user.
 
-    def __init__(self, app: ASGIApp, api_key: str) -> None:
+    A per-user key is a full credential: it authenticates its owner and replaces PIN input.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
         self._app = app
-        self._api_key = api_key
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -63,22 +73,41 @@ class ApiKeyMiddleware:
         if path in PUBLIC_PATHS:
             await self._app(scope, receive, send)
             return
-        provided, requested_user, header_pin = _extract_headers(scope.get("headers", []))
-        server_key_valid = bool(self._api_key) and hmac.compare_digest(
-            provided.encode(), self._api_key.encode()
-        )
-        if self._api_key and not server_key_valid:
-            body = b'{"detail":"invalid or missing API key"}'
-            await send({
-                "type": "http.response.start",
-                "status": 401,
-                "headers": [(b"content-type", b"application/json"),
-                            (b"content-length", str(len(body)).encode())],
-            })
-            await send({"type": "http.response.body", "body": body})
+        provided_key, requested_user, header_pin = _extract_headers(scope.get("headers", []))
+        owner = await run_in_threadpool(self._resolve_owner, provided_key)
+        if owner is None:
+            await self._reject(send)
             return
-        set_request_identity(requested_user, header_pin)
+        if requested_user and requested_user != owner:
+            await self._reject(send)
+            return
+        # A valid key is the account's credential: it replaces PIN entry for this request.
+        set_key_authenticated_user(owner)
+        set_request_identity(owner, header_pin)
         try:
             await self._app(scope, receive, send)
         finally:
             set_request_identity(None, None)
+            set_key_authenticated_user(None)
+
+    def _resolve_owner(self, provided_key: str) -> str | None:
+        if not provided_key:
+            return None
+        try:
+            return get_service().authenticate_api_key(provided_key)
+        except Exception:
+            # Fail closed: any DB/engine error must never be treated as an authenticated user.
+            return None
+
+    @staticmethod
+    async def _reject(send: Send) -> None:
+        body = b'{"error":"invalid or missing API key"}'
+        await send({
+            "type": "http.response.start",
+            "status": 401,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(body)).encode()),
+            ],
+        })
+        await send({"type": "http.response.body", "body": body})

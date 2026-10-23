@@ -40,6 +40,27 @@ users = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
+user_api_keys = Table(
+    "user_api_keys",
+    metadata,
+    Column("key_id", String(36), primary_key=True),
+    Column(
+        "user_id",
+        String(64),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    ),
+    # Only the SHA-256 hash of the key is stored. The raw key is shown once at issue time.
+    Column("key_hash", String(64), nullable=False, unique=True),
+    # Short display prefix (first 8 chars) for logs and key lists without exposing the secret.
+    Column("key_prefix", String(16), nullable=False),
+    Column("note", String(200), nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("last_used_at", DateTime(timezone=True), nullable=True),
+    Column("revoked_at", DateTime(timezone=True), nullable=True),
+)
+
 user_policies = Table(
     "user_policies",
     metadata,

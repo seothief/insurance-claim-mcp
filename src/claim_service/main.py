@@ -14,7 +14,6 @@ from fastapi.responses import JSONResponse
 from fastmcp.utilities.lifespan import combine_lifespans
 
 from claim_service.api.auth import ApiKeyMiddleware
-from claim_service.config import get_settings
 from claim_service.mcp.server import mcp
 from claim_service.runtime import init_runtime
 
@@ -52,8 +51,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         return JSONResponse({"service": "insurance-claim-mcp", "version": APP_VERSION})
 
     app.mount(MCP_PATH, mcp_app)
-    api_key = get_settings().api_key
-    app.add_middleware(ApiKeyMiddleware, api_key=api_key)
+    app.add_middleware(ApiKeyMiddleware)
     return app
 
 
