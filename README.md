@@ -25,6 +25,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m uvicorn claim_service.main:app --app-dir src --port 8080
 ```
 - 상태 확인: `GET /api/health`, `GET /api/version` (인증 불필요)
+- 설치가 실패하거나 `pip`이 없는 경우(`No module named pip`, `pip._vendor` 누락): [로컬 개발 환경 설치](docs/setup.md)
 - MCP 엔드포인트 (Streamable HTTP): `POST /mcp` (또는 `/mcp/`)
 - MCP 로컬 실행 (stdio): `.\.venv\Scripts\python.exe -m claim_service.mcp.server`
 
