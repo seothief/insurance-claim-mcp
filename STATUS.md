@@ -13,6 +13,7 @@
 - 테스트: `tests/test_user_api_keys.py` 신규(해시만 저장, 키→소유자 해석, PIN 대체, 폐기, 목록 비노출, 미존재 사용자 발급 거부). `tests/test_deploy.py`를 사용자 키 인증 기준으로 재작성.
 - **검증(실행 결과)**: `pytest -q` 43 passed, `ruff check src tests scripts` 통과, `mypy src` 26개 파일 통과. 운영자 CLI는 임시 SQLite에서 발급→목록→폐기→상태 표시를 실제 실행해 확인함.
 - 브랜치: `feat/per-user-api-keys-v2`.
+- 설치 매뉴얼: `docs/setup.md` 신규(요구 사항, venv·pip 실패 유형별 복구, 시스템 파이썬 대안, 검증 명령, 플랫폼 참고), `README.md`에서 링크, `requirements.lock.txt`의 UTF-8 BOM 제거.
 - 로컬 환경 참고: 프로젝트 `.venv`가 pip 없이 생성되어(`pip._vendor` 누락) 사용할 수 없어, 시스템 파이썬(`C:\Python312`, pip 26.2, 사용자 site-packages)에 잠금 의존성을 설치해 검증함. 운영 배포는 실행하지 않음.
 
 ## 최신 진행 상황 (2026-10-22)
