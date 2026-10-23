@@ -5,7 +5,9 @@ from pathlib import Path
 from sqlalchemy import inspect, text
 
 from claim_service.db.engine import create_db_engine, init_schema
+from claim_service.db.repository import PolicyRepository
 from claim_service.db.tables import metadata
+from claim_service.domain.security import api_key_prefix, hash_api_key
 
 
 def test_policy_source_migration_adds_columns_and_marks_existing_rows_user_stated(
@@ -58,4 +60,63 @@ def test_policy_source_migration_adds_columns_and_marks_existing_rows_user_state
 
     assert policy_source == "USER_STATED"
     assert rider_source == "USER_STATED"
+    engine.dispose()
+
+
+def test_user_api_key_migration_upgrades_legacy_token_hash_schema(tmp_path: Path) -> None:
+    """The 2026-10-17 per-user key table used token_hash and lacked prefix/lifecycle columns."""
+    engine = create_db_engine(f"sqlite:///{tmp_path / 'legacy_keys.db'}")
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE TABLE users ("
+                "user_id VARCHAR(64) PRIMARY KEY, "
+                "display_alias VARCHAR(100), "
+                "birth_year INTEGER, "
+                "pin_hash VARCHAR(128), "
+                "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE TABLE user_api_keys ("
+                "key_id VARCHAR(36) PRIMARY KEY, "
+                "user_id VARCHAR(64) NOT NULL, "
+                "token_hash VARCHAR(64) NOT NULL UNIQUE, "
+                "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+            )
+        )
+        connection.execute(text("INSERT INTO users (user_id) VALUES ('legacy-key-user')"))
+        connection.execute(
+            text(
+                "INSERT INTO user_api_keys (key_id, user_id, token_hash) "
+                "VALUES ('legacy-key', 'legacy-key-user', 'hashed-legacy-token')"
+            )
+        )
+
+    init_schema(engine)
+
+    with engine.connect() as connection:
+        columns = {column["name"] for column in inspect(connection).get_columns("user_api_keys")}
+        migrated_hash = connection.execute(
+            text("SELECT key_hash FROM user_api_keys WHERE key_id = 'legacy-key'")
+        ).scalar_one()
+
+    assert {
+        "key_id",
+        "user_id",
+        "key_hash",
+        "key_prefix",
+        "note",
+        "last_used_at",
+        "revoked_at",
+    } <= columns
+    assert "token_hash" not in columns
+    assert migrated_hash == "hashed-legacy-token"
+
+    # New keys must be issuable on the migrated schema.
+    repo = PolicyRepository(engine)
+    raw_key = "raw-legacy-schema-key"
+    repo.create_api_key("legacy-key-user", hash_api_key(raw_key), api_key_prefix(raw_key))
+    assert repo.find_active_key_owner(hash_api_key(raw_key)) == "legacy-key-user"
     engine.dispose()

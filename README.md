@@ -25,6 +25,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m uvicorn claim_service.main:app --app-dir src --port 8080
 ```
 - 상태 확인: `GET /api/health`, `GET /api/version` (인증 불필요)
+- 설치가 실패하거나 `pip`이 없는 경우(`No module named pip`, `pip._vendor` 누락): [로컬 개발 환경 설치](docs/setup.md)
 - MCP 엔드포인트 (Streamable HTTP): `POST /mcp` (또는 `/mcp/`)
 - MCP 로컬 실행 (stdio): `.\.venv\Scripts\python.exe -m claim_service.mcp.server`
 
@@ -33,7 +34,7 @@ python -m venv .venv
 - 기본: 로컬 SQLite (`claim_service.db`, 프로젝트 루트에 생성되며 `.gitignore`로 커밋 제외)
 - 클라우드: 환경변수 `DATABASE_URL`을 PostgreSQL URL로 지정 (예: `postgresql+psycopg://...`)
 - 평가 요청(질병코드, 진료비)은 저장하지 않고 계산 결과만 반환합니다.
-- MCP HTTP 접근은 서버 공용 `X-API-Key`(`hmac.compare_digest` 상수 시간 비교)로 인증합니다. `X-User-Id`는 요청을 특정 사용자 별명에 귀속시키며 인증을 대체하지 않습니다. PIN 보호 계정은 `PBKDF2-HMAC-SHA256`(120,000회 반복) 해시로 검증을 유지합니다. [클라이언트 연결 가이드](docs/mcp-client-setup.md)를 참조하세요.
+- MCP HTTP 접근은 사용자별 API 키(`X-User-Key` 헤더 또는 `Bearer`)로 인증합니다. 키 원문은 발급 시 한 번만 표시되고 서버에는 SHA-256 해시만 저장됩니다. 키 인증은 요청을 소유 사용자에 귀속시킵니다(PIN 입력 대체). PIN 보호 계정은 `PBKDF2-HMAC-SHA256`(120,000회 반복) 해시로 검증을 유지합니다. 키 발급·폐기는 [사용자별 API/MCP 키 가이드](docs/user-api-keys.md), 연결 설정은 [클라이언트 연결 가이드](docs/mcp-client-setup.md)를 참조하세요.
 
 ## 테스트 및 정적 분석
 

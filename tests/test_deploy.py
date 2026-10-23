@@ -1,4 +1,4 @@
-"""Deployment checks for database URLs, health endpoints and MCP HTTP access."""
+"""Deployment checks for database URLs, health endpoints and per-user-key MCP HTTP access."""
 
 from collections.abc import Iterator
 from pathlib import Path
@@ -6,8 +6,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from claim_service.config import get_settings
-from claim_service.db.engine import normalize_database_url
+from claim_service.db.engine import create_db_engine, normalize_database_url
+from claim_service.db.repository import PolicyRepository
+from claim_service.domain.models import UserIn
+from claim_service.domain.security import api_key_prefix, generate_api_key, hash_api_key
 from claim_service.main import create_app
 from tests.dbutil import database_url_for
 
@@ -20,45 +22,56 @@ def test_postgres_urls_use_psycopg_driver() -> None:
 
 @pytest.fixture
 def keyed_client(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fresh_external_schema: None
-) -> Iterator[TestClient]:
-    monkeypatch.setenv("API_KEY", "secret-test-key")
-    get_settings.cache_clear()
-    app = create_app(database_url_for(tmp_path, "keyed.db"))
-    with TestClient(app) as client:
-        yield client
-    monkeypatch.delenv("API_KEY")
-    get_settings.cache_clear()
+    tmp_path: Path, fresh_external_schema: None
+) -> Iterator[tuple[TestClient, str]]:
+    """App bound to a fresh DB with one user that owns an active key."""
+    database_url = database_url_for(tmp_path, "keyed.db")
+    with TestClient(create_app(database_url)) as client:
+        engine = create_db_engine(database_url)
+        repo = PolicyRepository(engine)
+        repo.create_user(UserIn(user_id="seoth"))
+        raw_key = generate_api_key()
+        repo.create_api_key("seoth", hash_api_key(raw_key), api_key_prefix(raw_key))
+        yield client, raw_key
+        engine.dispose()
 
 
-def test_health_and_version_remain_public(keyed_client: TestClient) -> None:
-    assert keyed_client.get("/api/health").json() == {"status": "ok"}
-    assert keyed_client.get("/api/version").json()["service"] == "insurance-claim-mcp"
+def test_health_and_version_remain_public(keyed_client: tuple[TestClient, str]) -> None:
+    client, _ = keyed_client
+    assert client.get("/api/health").json() == {"status": "ok"}
+    assert client.get("/api/version").json()["service"] == "insurance-claim-mcp"
 
 
-def test_openapi_and_general_web_routes_are_not_served(keyed_client: TestClient) -> None:
+def test_openapi_and_general_web_routes_are_not_served(
+    keyed_client: tuple[TestClient, str],
+) -> None:
+    client, raw_key = keyed_client
     for path in ("/", "/openapi.json", "/llms.txt", "/about.md", "/start", "/ai/guide"):
-        response = keyed_client.get(path, headers={"X-API-Key": "secret-test-key"})
+        response = client.get(path, headers={"X-User-Key": raw_key})
         assert response.status_code == 404
 
 
-def test_mcp_rejects_missing_or_wrong_key(keyed_client: TestClient) -> None:
-    assert keyed_client.post("/mcp", json={}).status_code == 401
-    wrong = keyed_client.post("/mcp", headers={"X-API-Key": "nope"}, json={})
+def test_mcp_rejects_missing_or_wrong_key(keyed_client: tuple[TestClient, str]) -> None:
+    client, _ = keyed_client
+    assert client.post("/mcp", json={}).status_code == 401
+    wrong = client.post("/mcp", headers={"X-User-Key": "nope"}, json={})
     assert wrong.status_code == 401
-    user_identity_is_not_auth = keyed_client.get(
-        "/mcp",
-        headers={"X-User-Id": "seoth", "X-User-Key": "legacy-user-key"},
-    )
-    assert user_identity_is_not_auth.status_code == 401
 
 
+def test_mcp_rejects_user_mismatch_with_key(keyed_client: tuple[TestClient, str]) -> None:
+    client, raw_key = keyed_client
+    response = client.get("/mcp", headers={"X-User-Key": raw_key, "X-User-Id": "someone-else"})
+    assert response.status_code == 401
 
-def test_mcp_without_trailing_slash_does_not_redirect(keyed_client: TestClient) -> None:
-    response = keyed_client.post(
+
+def test_mcp_without_trailing_slash_does_not_redirect(
+    keyed_client: tuple[TestClient, str],
+) -> None:
+    client, raw_key = keyed_client
+    response = client.post(
         "/mcp",
         headers={
-            "X-API-Key": "secret-test-key",
+            "X-User-Key": raw_key,
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
         },
@@ -77,7 +90,8 @@ def test_mcp_without_trailing_slash_does_not_redirect(keyed_client: TestClient) 
     assert response.status_code == 200
 
 
-def test_mcp_accepts_x_api_key_and_bearer(keyed_client: TestClient) -> None:
+def test_mcp_accepts_user_key_and_bearer(keyed_client: tuple[TestClient, str]) -> None:
+    client, raw_key = keyed_client
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json, text/event-stream",
@@ -93,8 +107,8 @@ def test_mcp_accepts_x_api_key_and_bearer(keyed_client: TestClient) -> None:
         },
     }
     for auth in (
-        {"X-API-Key": "secret-test-key"},
-        {"Authorization": "Bearer secret-test-key"},
+        {"X-User-Key": raw_key},
+        {"Authorization": f"Bearer {raw_key}"},
     ):
-        response = keyed_client.post("/mcp", headers={**headers, **auth}, json=request)
+        response = client.post("/mcp", headers={**headers, **auth}, json=request)
         assert response.status_code == 200

@@ -1,6 +1,22 @@
 # 진행 현황
 
-최종 갱신: 2026-10-22
+최종 갱신: 2026-10-23
+
+## 최신 진행 상황 (2026-10-23)
+
+- **인증 방식 전환(사용자별 전용 키)**: 공용 `API_KEY` 인증을 제거하고, 사용자별 키(`X-User-Key` 또는 `Bearer`)로 MCP HTTP를 인증하도록 변경함. 유효한 키는 요청을 소유 사용자에게 귀속시키고 해당 계정의 PIN 입력을 대체함.
+- DB: `user_api_keys` 테이블(`key_id`, `user_id`, `key_hash` SHA-256, `key_prefix`, `note`, `created_at`, `last_used_at`, `revoked_at`) 추가. 원문 키는 발급 시 1회만 표시하고 서버에는 SHA-256 해시만 저장함.
+- 운영자 CLI: `scripts/manage_user_keys.py`의 `issue`/`list`/`revoke`. `list`는 key_id·prefix·상태(사용 중/폐기됨)만 표시하며 원문·해시는 노출하지 않음.
+- 공용 키 회전 도구 정리: `scripts/rotate_api_key.py`, `tests/test_rotate_api_key.py`, `docs/api-key-rotation.md` 제거. `docs/user-api-keys.md` 신규 추가.
+- 배포/로컬 설정: `.github/workflows/deploy-cloudrun.yml`에서 `API_KEY` Secret 주입 제거, `docker-compose.yml`에서 `API_KEY` 환경변수 제거. `config.py`의 `api_key` 설정 제거.
+- 문서 갱신: `README.md`, `docs/mcp-client-setup.md`, `docs/agent-connect-prompt.md`, `docs/deployment.md`.
+- 테스트: `tests/test_user_api_keys.py` 신규(해시만 저장, 키→소유자 해석, PIN 대체, 폐기, 목록 비노출, 미존재 사용자 발급 거부). `tests/test_deploy.py`를 사용자 키 인증 기준으로 재작성.
+- **검증(실행 결과)**: `pytest -q` 43 passed, `ruff check src tests scripts` 통과, `mypy src` 26개 파일 통과. 운영자 CLI는 임시 SQLite에서 발급→목록→폐기→상태 표시를 실제 실행해 확인함.
+- 브랜치: `feat/per-user-api-keys-v2`.
+- 설치 매뉴얼: `docs/setup.md` 신규(요구 사항, venv·pip 실패 유형별 복구, 시스템 파이썬 대안, 검증 명령, 플랫폼 참고), `README.md`에서 링크, `requirements.lock.txt`의 UTF-8 BOM 제거.
+- 로컬 환경 참고: 프로젝트 `.venv`가 pip 없이 생성되어(`pip._vendor` 누락) 사용할 수 없어, 시스템 파이썬(`C:\Python312`, pip 26.2, 사용자 site-packages)에 잠금 의존성을 설치해 검증함. 운영 배포는 실행하지 않음.
+- **운영 DB 레거시 스키마 마이그레이션**: 운영 DB에 2026-10-17 사용자별 키 구현 당시의 `user_api_keys`(`token_hash`, `key_prefix` 등 없음, 행 0개)가 남아 있어 `column key_prefix does not exist` 오류가 발생함. `metadata.create_all`은 기존 테이블을 건너뛰므로 `init_schema()`에 `token_hash → key_hash` 이름 변경과 `key_prefix`/`note`/`last_used_at`/`revoked_at` 추가 마이그레이션을 구현함(기존 행 보존, 테이블 삭제 없음). 마이그레이션 테스트를 추가함.
+- **운영 DB 적용 결과(실행)**: 마이그레이션 적용 후 컬럼이 `key_id,user_id,key_hash,created_at,key_prefix,note,last_used_at,revoked_at`로 확인됨. `shj` 사용자에게 키 1건을 발급하고 해시 조회로 소유자 귀속을 확인함. 키 원문은 이 문서에 기록하지 않음.
 
 ## 최신 진행 상황 (2026-10-22)
 

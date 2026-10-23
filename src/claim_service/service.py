@@ -35,6 +35,8 @@ from claim_service.domain.onboarding import (
 from claim_service.domain.security import (
     get_bound_user,
     get_header_pin,
+    get_key_authenticated_user,
+    hash_api_key,
     hash_pin,
     verify_pin,
 )
@@ -50,6 +52,11 @@ class PolicyService:
 
     def onboarding_guide(self) -> dict[str, object]:
         return build_onboarding_guide(self._repo.get_rules().values())
+
+    # ---- per-user API keys ---------------------------------------------
+    def authenticate_api_key(self, key: str) -> str | None:
+        """Resolve an API key to its owner. Returns None when the key is missing or revoked."""
+        return self._repo.find_active_key_owner(hash_api_key(key))
 
     # ---- onboarding -----------------------------------------------------
     def register_user(self, user: UserIn) -> UserProfile:
@@ -252,6 +259,9 @@ class PolicyService:
 
     @staticmethod
     def _check_pin(record: dict[str, Any], pin: str | None) -> None:
+        # A per-user API key proves the account's identity and replaces PIN entry.
+        if get_key_authenticated_user() == record.get("user_id"):
+            return
         stored_hash = record.get("pin_hash")
         if not stored_hash:
             return

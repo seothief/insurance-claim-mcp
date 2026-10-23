@@ -6,7 +6,7 @@
 - Actions의 **Deploy to Cloud Run → Run workflow**에서 `main`을 선택하면 한 번 실행으로 수동 배포할 수 있습니다.
 - 배포는 `main`만 허용하고, 이미지 태그는 해당 커밋 SHA입니다.
 - 빌드·배포 후 `/api/health`, `/api/version`을 검사합니다. 이 경로는 Cloud Run 운영 상태 확인용이며 인증 없이 접근할 수 있습니다.
-- `APP_VERSION`은 최신 배포값으로 갱신합니다. DATABASE_URL/API_KEY Secret 연결은 최신 버전을 유지하며 그 밖의 기존 서비스 설정은 보존합니다.
+- `APP_VERSION`은 최신 배포값으로 갱신합니다. DATABASE_URL과 그 밖의 기존 서비스 설정은 보존합니다. 공용 `API_KEY` Secret은 더 이상 사용하지 않습니다.
 
 ## GitHub 저장소 설정
 
@@ -26,10 +26,11 @@ principalSet에만 배포 서비스 계정을 가장하도록 부여합니다. �
 Cloud Run 배포에 필요한 최소 권한을 부여하세요. Artifact Registry 저장소와 API는 사전에
 생성·활성화되어 있어야 합니다.
 
-Cloud Run **실행 서비스 계정**에는 `DATABASE_URL`과 `API_KEY` Secret Manager 버전에 대한
-Secret Accessor 권한이 필요합니다. 두 Secret과 기존 Cloud Run 서비스
+Cloud Run **실행 서비스 계정**에는 `DATABASE_URL` Secret Manager 버전에 대한
+Secret Accessor 권한이 필요합니다. 해당 Secret과 기존 Cloud Run 서비스
 `insurance-claim-mcp`도 배포 전에 준비해야 합니다. 배포 워크플로는 비밀 값을 GitHub에
-복사하지 않고 기존 Secret Manager 연결을 사용합니다.
+복사하지 않고 기존 Secret Manager 연결을 사용합니다. 인증은 사용자별 API 키([사용자별 API/MCP 키](user-api-keys.md))로
+처리하므로 공용 `API_KEY` Secret은 필요하지 않습니다.
 
 ## 점검
 

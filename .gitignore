@@ -20,6 +20,9 @@ gha-creds-*.json
 
 # Local scratch files
 *.tmp.txt
+*.log
+*.out
+*.err
 
 # Local SQLite databases (contain user policy data, never commit)
 *.db
