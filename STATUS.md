@@ -15,6 +15,8 @@
 - 브랜치: `feat/per-user-api-keys-v2`.
 - 설치 매뉴얼: `docs/setup.md` 신규(요구 사항, venv·pip 실패 유형별 복구, 시스템 파이썬 대안, 검증 명령, 플랫폼 참고), `README.md`에서 링크, `requirements.lock.txt`의 UTF-8 BOM 제거.
 - 로컬 환경 참고: 프로젝트 `.venv`가 pip 없이 생성되어(`pip._vendor` 누락) 사용할 수 없어, 시스템 파이썬(`C:\Python312`, pip 26.2, 사용자 site-packages)에 잠금 의존성을 설치해 검증함. 운영 배포는 실행하지 않음.
+- **운영 DB 레거시 스키마 마이그레이션**: 운영 DB에 2026-10-17 사용자별 키 구현 당시의 `user_api_keys`(`token_hash`, `key_prefix` 등 없음, 행 0개)가 남아 있어 `column key_prefix does not exist` 오류가 발생함. `metadata.create_all`은 기존 테이블을 건너뛰므로 `init_schema()`에 `token_hash → key_hash` 이름 변경과 `key_prefix`/`note`/`last_used_at`/`revoked_at` 추가 마이그레이션을 구현함(기존 행 보존, 테이블 삭제 없음). 마이그레이션 테스트를 추가함.
+- **운영 DB 적용 결과(실행)**: 마이그레이션 적용 후 컬럼이 `key_id,user_id,key_hash,created_at,key_prefix,note,last_used_at,revoked_at`로 확인됨. `shj` 사용자에게 키 1건을 발급하고 해시 조회로 소유자 귀속을 확인함. 키 원문은 이 문서에 기록하지 않음.
 
 ## 최신 진행 상황 (2026-10-22)
 
