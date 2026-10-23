@@ -17,6 +17,8 @@
 - 로컬 환경 참고: 프로젝트 `.venv`가 pip 없이 생성되어(`pip._vendor` 누락) 사용할 수 없어, 시스템 파이썬(`C:\Python312`, pip 26.2, 사용자 site-packages)에 잠금 의존성을 설치해 검증함. 운영 배포는 실행하지 않음.
 - **운영 DB 레거시 스키마 마이그레이션**: 운영 DB에 2026-10-17 사용자별 키 구현 당시의 `user_api_keys`(`token_hash`, `key_prefix` 등 없음, 행 0개)가 남아 있어 `column key_prefix does not exist` 오류가 발생함. `metadata.create_all`은 기존 테이블을 건너뛰므로 `init_schema()`에 `token_hash → key_hash` 이름 변경과 `key_prefix`/`note`/`last_used_at`/`revoked_at` 추가 마이그레이션을 구현함(기존 행 보존, 테이블 삭제 없음). 마이그레이션 테스트를 추가함.
 - **운영 DB 적용 결과(실행)**: 마이그레이션 적용 후 컬럼이 `key_id,user_id,key_hash,created_at,key_prefix,note,last_used_at,revoked_at`로 확인됨. `shj` 사용자에게 키 1건을 발급하고 해시 조회로 소유자 귀속을 확인함. 키 원문은 이 문서에 기록하지 않음.
+- **배포(실행 결과)**: PR #1 병합(`98f3d29`) 후 `main` CI 통과, `Deploy to Cloud Run` 워크플로가 이미지 빌드·푸시·배포·스모크 검증까지 모두 success. 배포 버전 `/api/version` = `98f3d2998d3a6bbcc1f22a2fdce6eb4afc019ccd`.
+- **원격 인증 검증(실행 결과)**: 키 없는 `/mcp` 401, 잘못된 키 401, 유효 키로 `initialize` 200, PIN 보호 계정(`shj`)을 **PIN 없이** `get_user_profile` 호출해 200(키가 PIN을 대체함), 키 소유자와 다른 `X-User-Id` 요청 401.
 
 ## 최신 진행 상황 (2026-10-22)
 
