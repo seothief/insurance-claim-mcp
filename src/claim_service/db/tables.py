@@ -126,6 +126,8 @@ user_policy_riders = Table(
     Column("source_type", String(32), nullable=False, default="USER_STATED"),
     Column("issuer", String(100), nullable=True),
     Column("issued_on", String(10), nullable=True),
+    # 특약별 약관 지급 요건 오버라이드 (없으면 표준 규칙의 rule_config 사용)
+    Column("rule_config_override", JSON, nullable=True),
     UniqueConstraint("policy_id", "rider_name", name="uq_policy_rider_name"),
 )
 

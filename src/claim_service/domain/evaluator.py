@@ -101,6 +101,17 @@ def _evaluate_rider(
     if rider.mapped_rule_id is None or rider.mapped_rule_id not in rules:
         return None
     rule = rules[rider.mapped_rule_id]
+    # 특약별 지급 요건(증권 근거)이 있으면 표준 규칙의 rule_config를 대체해 계산에 쓴다.
+    # 이때 검증 상태는 증권 근거로 간주한다(Fail-Closed 예외는 개인 특약 source 검증이 담당).
+    override_used = rider.rule_config_override is not None and rider.is_source_verified
+    if override_used:
+        rule = rule.model_copy(
+            update={
+                "rule_config": rider.rule_config_override,
+                "verified": True,
+                "source_reference": "특약 증권/약관에서 확인한 지급 요건 (rider override)",
+            }
+        )
     if not rule.verified:
         return make_outcome(
             policy,
@@ -110,7 +121,18 @@ def _evaluate_rider(
             0,
             f"'{rule.display_name}' 규칙이 약관 원문으로 검증되지 않아 계산하지 않았습니다.",
         )
-    return evaluate_rider(rule, policy, rider, claim)
+    outcome = evaluate_rider(rule, policy, rider, claim)
+    if outcome is not None and override_used:
+        outcome = Outcome(
+            result=outcome.result.model_copy(
+                update={
+                    "basis": outcome.result.basis
+                    + " (이 특약의 증권/약관에서 확인한 지급 요건 기준)"
+                }
+            ),
+            rule_id=outcome.rule_id,
+        )
+    return outcome
 
 
 def _evaluate_silson(

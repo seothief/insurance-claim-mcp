@@ -48,6 +48,7 @@ class RiderPlan:
     source_type: str = "USER_STATED"
     issuer: str | None = None
     issued_on: str | None = None
+    rule_config_override: dict[str, Any] | None = None
 
 
 class PolicyRepository:
@@ -350,6 +351,7 @@ class PolicyRepository:
                         source_type=rider.source_type,
                         issuer=rider.issuer,
                         issued_on=rider.issued_on,
+                        rule_config_override=rider.rule_config_override,
                     )
                 )
                 continue
@@ -359,6 +361,8 @@ class PolicyRepository:
                 "source_type": rider.source_type,
                 "issuer": rider.issuer,
                 "issued_on": rider.issued_on,
+                # The latest document also refreshes the rider-specific coverage condition.
+                "rule_config_override": rider.rule_config_override,
             }
             # Overwrite the mapping only when it is unresolved or the caller set it explicitly.
             # A confirmed mapping (MAPPED / CUSTOM / IGNORED) is kept on re-registration.
@@ -440,6 +444,7 @@ class PolicyRepository:
             source_type=row["source_type"] or "USER_STATED",
             issuer=row["issuer"],
             issued_on=row["issued_on"],
+            rule_config_override=row.get("rule_config_override"),
         )
 
     @staticmethod

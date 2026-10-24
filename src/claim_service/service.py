@@ -194,6 +194,7 @@ class PolicyService:
             source_type=rider.source_type,
             issuer=rider.issuer,
             issued_on=rider.issued_on,
+            rule_config_override=rider.rule_config_override,
         )
 
     @staticmethod
@@ -214,6 +215,8 @@ class PolicyService:
             values.update(mapped_rule_id=None, custom_rule_config=None)
         if body.coverage_amount is not None:
             values["coverage_amount"] = body.coverage_amount
+        if body.rule_config_override is not None:
+            values["rule_config_override"] = body.rule_config_override
         return values
 
     def evaluate(

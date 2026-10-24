@@ -14,6 +14,7 @@ def _rider(
     rule_id: str | None,
     status: str = "MAPPED",
     custom: dict[str, object] | None = None,
+    override: dict[str, object] | None = None,
 ) -> RiderOut:
     # These fixtures model a policy certificate, the only source the engine calculates from.
     return RiderOut(
@@ -24,6 +25,7 @@ def _rider(
         mapping_status=status,  # type: ignore[arg-type]
         custom_rule_config=custom,
         source_type="POLICY_CERTIFICATE",
+        rule_config_override=override,
     )
 
 
@@ -153,3 +155,63 @@ def test_flu_by_drug_and_by_kcd() -> None:
     assert by_kcd.total_estimated_payout == 200000
     none = evaluate_claim("u", [policy], RULES, ClaimInput(kcd_code="S82.1"))
     assert none.matched_benefits == []
+# ---- ③ 특약별 약관 지급 요건 오버라이드 (rule_config_override) -----------------
+
+
+def test_rider_override_replaces_standard_rule_config() -> None:
+    """Certificate rider with an override uses the override, not the standard rule config."""
+    rider = _rider(
+        "골절진단비",
+        300000,
+        "FRACTURE_DIAGNOSIS",
+        override={"target_kcd_prefixes": ["Z99"]},
+    )
+    claim = ClaimInput(kcd_code="S72.0")  # 표준 규칙은 S72를, override는 Z99만 보장
+    result = evaluate_claim("u", [_comprehensive(rider)], RULES, claim)
+    assert result.matched_benefits == []
+    assert result.total_estimated_payout == 0
+
+
+def test_rider_override_can_add_coverage_and_marks_basis() -> None:
+    rider = _rider(
+        "골절진단비",
+        300000,
+        "FRACTURE_DIAGNOSIS",
+        override={"target_kcd_prefixes": ["S99"]},
+    )
+    claim = ClaimInput(kcd_code="S99")
+    result = evaluate_claim("u", [_comprehensive(rider)], RULES, claim)
+    assert result.matched_benefits[0].status == "ELIGIBLE"
+    assert result.matched_benefits[0].estimated_amount == 300000
+    assert "특약의 증권/약관에서 확인한 지급 요건 기준" in result.matched_benefits[0].basis
+
+
+def test_rider_override_enables_calculation_when_rule_unverified() -> None:
+    """Override + certificate source bridges the standard rule's verified=False gate."""
+    rider = _rider(
+        "골절진단비",
+        300000,
+        "FRACTURE_DIAGNOSIS",
+        override={"target_kcd_prefixes": ["S72"]},
+    )
+    claim = ClaimInput(kcd_code="S72.0")
+    result = evaluate_claim("u", [_comprehensive(rider)], UNVERIFIED_RULES, claim)
+    assert result.matched_benefits[0].status == "ELIGIBLE"
+    assert result.matched_benefits[0].estimated_amount == 300000
+
+
+def test_rider_override_ignored_for_user_stated_source() -> None:
+    """A stated (non-certificate) rider stays Fail-Closed even with an override."""
+    rider = RiderOut(
+        rider_id="id-stated",
+        rider_name="골절진단비",
+        coverage_amount=300000,
+        mapped_rule_id="FRACTURE_DIAGNOSIS",
+        mapping_status="MAPPED",
+        source_type="USER_STATED",
+        rule_config_override={"target_kcd_prefixes": ["S72"]},
+    )
+    claim = ClaimInput(kcd_code="S72.0")
+    result = evaluate_claim("u", [_comprehensive(rider)], RULES, claim)
+    assert result.matched_benefits == []
+    assert any("골절진단비" in item for item in result.unverified_source_riders)

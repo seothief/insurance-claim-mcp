@@ -72,6 +72,9 @@ class RiderIn(BaseModel):
     source_type: SourceType = "USER_STATED"
     issuer: str | None = Field(default=None, max_length=100)
     issued_on: str | None = Field(default=None, max_length=10, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    # 약관/증권에서 확인한 이 특약만의 지급 요건(rule_config 오버라이드).
+    # POLICY_CERTIFICATE 특약에서만 계산 근거로 쓰고, None이면 표준 규칙의 rule_config를 쓴다.
+    rule_config_override: dict[str, Any] | None = None
 
 
 class PolicyIn(BaseModel):
@@ -98,6 +101,7 @@ class RiderOut(BaseModel):
     source_type: SourceType = "USER_STATED"
     issuer: str | None = None
     issued_on: str | None = None
+    rule_config_override: dict[str, Any] | None = None
 
     @property
     def is_source_verified(self) -> bool:
@@ -142,6 +146,8 @@ class RiderResolve(BaseModel):
     mapped_rule_id: str | None = None
     custom_rule_config: dict[str, Any] | None = None
     coverage_amount: int | None = Field(default=None, ge=0)
+    # 증권/약관에서 확인한 특약별 지급 요건. POLICY_CERTIFICATE 특약에서 계산에 반영된다.
+    rule_config_override: dict[str, Any] | None = None
 
 
 class ClaimInput(BaseModel):

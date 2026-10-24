@@ -99,3 +99,11 @@ def init_schema(engine: Engine) -> None:
             conn.execute(
                 text(f"ALTER TABLE user_api_keys ADD COLUMN revoked_at {timestamp_type}")
             )
+    with engine.begin() as conn:
+        rider_override_columns = {
+            col["name"] for col in inspect(conn).get_columns("user_policy_riders")
+        }
+        if "rule_config_override" not in rider_override_columns:
+            conn.execute(
+                text("ALTER TABLE user_policy_riders ADD COLUMN rule_config_override JSON")
+            )

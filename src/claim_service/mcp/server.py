@@ -189,14 +189,20 @@ def resolve_user_rider(
     mapped_rule_id: str | None = None,
     custom_rule_config: dict[str, object] | None = None,
     coverage_amount: int | None = None,
+    rule_config_override: dict[str, object] | None = None,
     pin: str | None = None,
 ) -> dict[str, object]:
-    """미매핑 특약의 매핑을 확정합니다 (MAPPED, CUSTOM, IGNORED)."""
+    """미매핑 특약의 매핑을 확정합니다 (MAPPED, CUSTOM, IGNORED).
+
+    rule_config_override: 증권/약관에서 확인한 이 특약만의 지급 요건(예:
+    {"target_kcd_prefixes": ["S72"]}). POLICY_CERTIFICATE 출처 특약에서 계산에 반영됩니다.
+    """
     body = RiderResolve(
         mapping_status=mapping_status,
         mapped_rule_id=mapped_rule_id,
         custom_rule_config=custom_rule_config,
         coverage_amount=coverage_amount,
+        rule_config_override=rule_config_override,
     )
     return _guard(
         lambda: get_service().resolve_rider(user_id, rider_id, body, pin=pin).model_dump()
