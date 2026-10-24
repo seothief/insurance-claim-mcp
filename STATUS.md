@@ -4,6 +4,8 @@
 
 ## 최신 진행 상황 (2026-10-24)
 
+- **종합 이용 가이드 작성(`docs/user-guide.md`)**: 최종 사용자(보험 가입자)와 설정자·운영자를 위한 사용법 문서 신설. "보험비서 시작" 트리거·계정(PIN)·보험 등록·청구 예상액 계산·결과 읽는 법(ELIGIBLE/NOT_EVALUATED/EXCLUDED, verified=false)을 안내하고, 운영자용 API 키 발급·폐기·MCP 연결 설정(X-User-Key)과 보안 주의를 포함. 기존 `docs/mcp-client-setup.md`·`docs/user-api-keys.md`는 기술 상세로 유지하고 교차 링크. README.md 상단에 이용 가이드 링크 추가.
+
 - **KCD 작업 계열 `main` 통합·푸시 완료(실행 결과)**: KCD 표준 코드 마스터(①)·담보 규칙 KCD 참조(②)·특약별 약관 규칙 귀속(③) 5커밋을 `origin/main` 위로 **rebase**한 뒤 `main`에 fast-forward 병합, `git push origin main` 완료(`75c0bac..9749e96`). rebase 중 충돌 3건(STATUS.md 기록 병합, repository.py import 블록, engine.py user_api_keys/rule_config_override 마이그레이션 병합)을 양쪽 모두 보존 방향으로 해결. 원격 작업(2026-10-23, per-user API key 인증 전환)과의 통합 검증: `pytest -q` **71 passed**, `ruff`·`mypy` 통과.
 - **KCD 전체 적재 완료(검증된 사실)**: 공공데이터포털 "건강보험심사평가원_상병마스터"(`건강보험심사평가원_상병마스터_20250930.csv`, CP949 인코딩, 47,798행)를 `scripts/load_kcd.py --replace`로 로컬 DB `kcd_codes`에 적재함. **21,299개 코드**(3단 2,085 · 4단 12,503 · 5단 6,711, 대분류 A~Z 26개 전부). catalog의 하드코딩 KCD 참조(골절 S02~S92, 독감 J09~J11, 화상 T20~T32)가 전부 공식 마스터에 존재함을 대조 검증(`RULE_CONFIG_MISSING_PREFIXES=0`).
 - **브랜치 정리 완료(실행 결과)**: main에 병합 완료된 로컬 브랜치 4개(`feat/kcd-master`, `feat/disable-synthetic-seed`, `feat/per-user-api-keys`, `feat/policy-management-db`)와 미병합 옛 브랜치 `feat/policy-collection-guidance`를 삭제함. 백업 태그 `backup/pre-cleanup-2026-10-22`는 유지. 이제 로컬 브랜치는 `main`만 남음.

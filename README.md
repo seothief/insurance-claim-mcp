@@ -17,6 +17,10 @@
   - 보험 업무는 **FastMCP (`Streamable HTTP /mcp` 및 로컬 `stdio`)**로만 제공합니다. Cloud Run 상태 확인용 `/api/health`, `/api/version` 외에는 REST API, OpenAPI 스키마, 웹 브리지 또는 소개 페이지를 제공하지 않습니다.
   - Cloud Run 서버리스 스케일링 환경을 위해 `stateless_http=True` 및 `combine_lifespans`를 적용하고, 리버스 프록시 뒤에서 `/mcp` 307 리다이렉트 시 발생하는 HTTPS→HTTP 다운그레이드를 ASGI 미들웨어 경로 정규화로 해결했습니다.
 
+## 이용 가이드
+
+최종 사용자(보험 가입자)와 설정자·운영자를 위한 종합 사용법은 [이용 가이드](docs/user-guide.md)를 참조하세요.
+
 ## 로컬 실행
 
 ```powershell
@@ -34,7 +38,7 @@ python -m venv .venv
 - 기본: 로컬 SQLite (`claim_service.db`, 프로젝트 루트에 생성되며 `.gitignore`로 커밋 제외)
 - 클라우드: 환경변수 `DATABASE_URL`을 PostgreSQL URL로 지정 (예: `postgresql+psycopg://...`)
 - 평가 요청(질병코드, 진료비)은 저장하지 않고 계산 결과만 반환합니다.
-- MCP HTTP 접근은 사용자별 API 키(`X-User-Key` 헤더 또는 `Bearer`)로 인증합니다. 키 원문은 발급 시 한 번만 표시되고 서버에는 SHA-256 해시만 저장됩니다. 키 인증은 요청을 소유 사용자에 귀속시킵니다(PIN 입력 대체). PIN 보호 계정은 `PBKDF2-HMAC-SHA256`(120,000회 반복) 해시로 검증을 유지합니다. 키 발급·폐기는 [사용자별 API/MCP 키 가이드](docs/user-api-keys.md), 연결 설정은 [클라이언트 연결 가이드](docs/mcp-client-setup.md)를 참조하세요.
+- MCP HTTP 접근은 사용자별 API 키(`X-User-Key` 헤더 또는 `Bearer`)로 인증합니다. 키 원문은 발급 시 한 번만 표시되고 서버에는 SHA-256 해시만 저장됩니다. 키 인증은 요청을 소유 사용자에 귀속시킵니다(PIN 입력 대체). PIN 보호 계정은 `PBKDF2-HMAC-SHA256`(120,000회 반복) 해시로 검증을 유지합니다. 키 발급·폐기는 [사용자별 API/MCP 키 가이드](docs/user-api-keys.md), 연결 설정은 [클라이언트 연결 가이드](docs/mcp-client-setup.md), 종합 사용법은 [이용 가이드](docs/user-guide.md)를 참조하세요.
 
 ## 테스트 및 정적 분석
 
