@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import re
 import sys
 from collections import Counter
@@ -41,7 +42,7 @@ KO_NAME_HEADER_ALIASES = (
 )
 EN_NAME_HEADER_ALIASES = ("영문명", "상병명(영문)", "en_name", "engname", "kcdengname", "eng_name")
 
-_CODE_CELL_RE = re.compile(r"^[A-Z]\d{2}(\.\d{1,2})?$")
+_CODE_CELL_RE = re.compile(r"^[A-Z]\d{2,5}$")
 
 
 def _header_index(headers: list[str], aliases: tuple[str, ...]) -> int | None:
@@ -70,16 +71,26 @@ def _pick_code_column(headers: list[str]) -> int | None:
             return i
     return None
 def read_csv_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
-    """Return (headers, rows-as-dicts). Handles UTF-8 BOM and common providers."""
-    with path.open("r", encoding="utf-8-sig", newline="") as f:
-        sample = f.read(4096)
-        f.seek(0)
-        dialect = csv.Sniffer().sniff(sample) if sample else csv.excel
-        reader = csv.DictReader(f, dialect=dialect)
-        headers = list(reader.fieldnames) if reader.fieldnames is not None else []
-        rows: list[dict[str, str]] = []
-        for row in reader:
-            rows.append({key: value for key, value in row.items() if value is not None})
+    """Return (headers, rows-as-dicts) for a Korean public-data CSV.
+
+    Public data portals ship these files as UTF-8 (with or without BOM) or CP949/EUC-KR,
+    so the encoding is auto-detected by trying each candidate in order.
+    """
+    raw = path.read_bytes()
+    text: str | None = None
+    for enc in ("utf-8-sig", "utf-8", "cp949", "euc-kr"):
+        try:
+            text = raw.decode(enc)
+            break
+        except (UnicodeDecodeError, LookupError):
+            continue
+    if text is None:
+        raise ValueError(f"지원하지 않는 인코딩입니다: {path.name}")
+    reader = csv.DictReader(io.StringIO(text))
+    headers = list(reader.fieldnames) if reader.fieldnames is not None else []
+    rows: list[dict[str, str]] = []
+    for row in reader:
+        rows.append({key: value for key, value in row.items() if value is not None})
     return headers, rows
 
 
@@ -155,6 +166,9 @@ def main() -> int:
     parser.add_argument("--ko-col", type=str, default=None, help="한글명 컬럼명 직접 지정")
     parser.add_argument("--en-col", type=str, default=None, help="영문명 컬럼명 직접 지정")
     parser.add_argument("--verify-rule-configs", action="store_true")
+    parser.add_argument(
+        "--replace", action="store_true", help="적재 전 기존 kcd_codes를 비우고 교체"
+    )
     parser.add_argument("--database-url", type=str, default=None)
     args = parser.parse_args()
 
@@ -175,6 +189,9 @@ def main() -> int:
     engine = create_db_engine(args.database_url or settings.database_url)
     init_schema(engine)
     repo = PolicyRepository(engine)
+    if args.replace:
+        removed = repo.clear_kcd_codes()
+        print(f"CLEARED_EXISTING={removed}")
     written = repo.upsert_kcd_codes(records)
     total = repo.count_kcd_codes()
 

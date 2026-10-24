@@ -4,14 +4,16 @@
 
 ## 최신 진행 상황 (2026-10-24)
 
-- KCD 표준 코드 마스터 인프라 구축(1단계, `feat/kcd-master`): 보험 계산의 "공통 언어"(진료 코드 판정)를 하드코딩에서 공식 표준 분류 기반으로 전환하기 위한 기반 작업.
+- **KCD 전체 적재 완료(검증된 사실)**: 공공데이터포털 "건강보험심사평가원_상병마스터"(`건강보험심사평가원_상병마스터_20250930.csv`, CP949 인코딩, 47,798행)를 `scripts/load_kcd.py --replace`로 로컬 DB `kcd_codes`에 적재함. **21,299개 코드**(3단 2,085 · 4단 12,503 · 5단 6,711, 대분류 A~Z 26개 전부). catalog의 하드코딩 KCD 참조(골절 S02~S92, 독감 J09~J11, 화상 T20~T32)가 전부 공식 마스터에 존재함을 대조 검증(`RULE_CONFIG_MISSING_PREFIXES=0`).
+- **데이터 포맷 발견(검증된 사실)**: HIRA 상병마스터는 **점 없는 코드**(`S720`)를 쓰고, **숫자 자리수 = 분류 단계**(숫자2=3단, 3=4단, 4~5=5단)다. 이에 맞춰 `domain/kcd.py`의 정규화를 **점 없는 표준형**으로 확장함(`S72.0`→`S720`). 점 있는 KCD 공식 표기 입력도 동일 코드로 조회되도록 함. 인코딩은 UTF-8(BOM)·CP949·EUC-KR 자동 감지로 확장.
+- KCD 표준 코드 마스터 인프라 구축(`feat/kcd-master`): 보험 계산의 "공통 언어"(진료 코드 판정)를 하드코딩에서 공식 표준 분류 기반으로 전환하기 위한 기반 작업.
   - 신설: `kcd_codes` 테이블(`src/claim_service/db/tables.py`) — 코드·대분류·분류단계·한글명·영문명·출처버전·`verified`
   - 신설: `src/claim_service/domain/kcd.py` — KCD 코드 정규화·단계 분류·prefix 검증 헬퍼
-  - 추가: `PolicyRepository.upsert_kcd_codes/get_kcd_codes/count_kcd_codes`
-  - 신설: `scripts/load_kcd.py` — 공공데이터포털 상병마스터 CSV/통계청 분류표를 `kcd_codes`에 적재(헤더 자동 감지, `--verify-rule-configs`로 catalog KCD 참조 대조)
+  - 추가: `PolicyRepository.upsert_kcd_codes/get_kcd_codes/count_kcd_codes/clear_kcd_codes`
+  - 신설: `scripts/load_kcd.py` — 인코딩 자동 감지·헤더 자동 감지·`--replace`·`--verify-rule-configs`(catalog KCD 참조 대조) 지원. 적재된 `kcd_codes`는 SQLite(`*.db`)로 커밋 제외.
   - 신설: `tests/test_kcd.py` — 코드 파싱·리포지토리·catalog KCD 참조 검증
-- 데이터 조사 결과(검증된 사실): KCD(한국표준질병·사인분류) 전체 코드는 통계청 표준분류/KOICD(엑셀 다운로드)와 HIRA 상병마스터(공공데이터포털 파일)로 공개 제공됨(대분류 22·중분류 267·소분류 2,093·세분류 12,603·세세분류 6,335). 그러나 자동 다운로드 API는 로그인/키가 필요하고 GitHub 공개 데이터셋은 없어, **전체 적재용 원본 파일은 사용자가 공식 사이트에서 수동 다운로드 후 `scripts/load_kcd.py`로 적재**해야 함. 스모크 CSV(7건)로 적재·분류·조회 파이프라인은 검증 완료.
-- 검증: `pytest -q` 58 passed, `ruff check src tests scripts` 통과, `mypy src` 27개 파일 통과(신규 로더는 `MYPYPATH=src` 하에서 통과), 샘플 CSV 적재 스모크 확인.
+- 데이터 조사 결과(검증된 사실): KCD(한국표준질병·사인분류) 전체 코드는 통계청 표준분류/KOICD(엑셀 다운로드)와 HIRA 상병마스터(공공데이터포털 파일)로 공개 제공됨(대분류 22·소분류 2,093·세분류 12,603·세세분류 6,335 등). 자동 다운로드 API는 로그인/키가 필요하고 GitHub 공개 데이터셋은 없어, 원본 파일은 공식 사이트에서 수동 다운로드 후 적재함.
+- 검증: `pytest -q` 60 passed, `ruff check src tests scripts` 통과, `mypy src` 27개 파일 통과(신규 로더는 `MYPYPATH=src` 하에서 통과).
 - 미커밋 일회성 파일 4개 삭제: 운영 DB 정리 일회성 스크립트(`scripts/prune_users.py`, `scripts/review_accounts.py`)와 아키텍처 인포그래픽(html/png) 2개. 모두 git에 추적되지 않던 파일로, 사용자 결정에 따라 삭제함. Git 히스토리 변경 없음.
 - 삭제 후 `git status --short --branch` 상 추적되지 않은 파일 없음. 작업 트리 깨끗함(`main...origin/main` 동기화 상태 유지).
 

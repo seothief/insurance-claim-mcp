@@ -133,6 +133,12 @@ class PolicyRepository:
             count = conn.execute(select(func.count()).select_from(kcd_codes)).scalar()
         return int(count or 0)
 
+    def clear_kcd_codes(self) -> int:
+        """Delete every row in the KCD master. Returns the number of removed rows."""
+        with self._engine.begin() as conn:
+            result = conn.execute(delete(kcd_codes))
+        return int(result.rowcount or 0)
+
     # ---- users ----------------------------------------------------------
     def create_user(self, user: UserIn, pin_hash: str | None = None) -> bool:
         """Insert a user. Returns False when the user already exists."""

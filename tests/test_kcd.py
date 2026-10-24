@@ -14,18 +14,21 @@ from tests.dbutil import database_url_for
 
 
 class TestKcdParsing:
-    def test_normalize_code_uppercases_and_strips(self) -> None:
-        assert kcd.normalize_code(" s72.0 ") == "S72.0"
+    def test_normalize_code_to_dotless_line_format(self) -> None:
+        assert kcd.normalize_code(" s72.0 ") == "S720"
         assert kcd.normalize_code("t30") == "T30"
-        assert kcd.normalize_code("A00.01") == "A00.01"
+        assert kcd.normalize_code("A00.01") == "A0001"
+        assert kcd.normalize_code("a000") == "A000"
 
     @pytest.mark.parametrize(
         ("code", "expected"),
         [
             ("A", ("A", 1)),  # 대분류(장)
-            ("S72", ("S", 3)),  # 소분류(3단)
-            ("S72.0", ("S", 4)),  # 세분류(4단)
-            ("S72.00", ("S", 5)),  # 세세분류(5단, 한국 세분)
+            ("S72", ("S", 3)),  # 소분류(3단, 숫자2)
+            ("S720", ("S", 4)),  # 세분류(4단, 숫자3)
+            ("S72.0", ("S", 4)),  # 점 표기는 점 제거 후 동일
+            ("S7200", ("S", 5)),  # 세세분류(5단, 숫자4)
+            ("H26000", ("H", 5)),  # 한국 특수/한방 확장(숫자5)
             ("J10", ("J", 3)),
             ("T30", ("T", 3)),
         ],
@@ -38,7 +41,7 @@ class TestKcdParsing:
         assert kcd.normalize_code("S") == "S"
         assert kcd.classify_code("S") == ("S", 1)
 
-    @pytest.mark.parametrize("bad", ["", "72", "..", "A0", "S72.X", "S720"])
+    @pytest.mark.parametrize("bad", ["", "72", "..", "A0", "S72.X", "S7200X"])
     def test_invalid_codes_raise(self, bad: str) -> None:
         with pytest.raises(ValueError):
             kcd.normalize_code(bad)
@@ -59,7 +62,7 @@ class TestKcdRepository:
         repo = self._repo(tmp_path)
         rows = [
             {
-                "code": "S72.0",
+                "code": "S720",
                 "category": "S",
                 "level": 4,
                 "ko_name": "대퇴골의 골절",
@@ -83,8 +86,8 @@ class TestKcdRepository:
         assert written == 2
         assert repo.count_kcd_codes() == 2
         all_codes = repo.get_kcd_codes()
-        assert set(all_codes) == {"S72.0", "T30"}
-        assert all_codes["S72.0"]["ko_name"] == "대퇴골의 골절"
+        assert set(all_codes) == {"S720", "T30"}
+        assert all_codes["S720"]["ko_name"] == "대퇴골의 골절"
 
     def test_upsert_replaces_existing(self, tmp_path: Path) -> None:
         repo = self._repo(tmp_path)
