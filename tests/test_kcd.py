@@ -46,6 +46,24 @@ class TestKcdParsing:
         with pytest.raises(ValueError):
             kcd.normalize_code(bad)
 
+    def test_match_kcd_code_is_dot_agnostic(self) -> None:
+        prefixes = ["S02", "S12", "S72"]
+        # Dot-less (master line format) input
+        assert kcd.match_kcd_code("S720", prefixes)
+        # Dotted official notation input
+        assert kcd.match_kcd_code("S72.0", prefixes)
+        assert kcd.match_kcd_code("S02.5", prefixes)  # target 에는 매칭됨 (exclusion 없음)
+        assert not kcd.match_kcd_code("J00", prefixes)
+        assert not kcd.match_kcd_code("", prefixes)
+        assert not kcd.match_kcd_code(None, prefixes)
+
+    def test_match_kcd_code_exclusion_takes_priority(self) -> None:
+        prefixes = ["S02", "S12", "S72"]
+        excluded = ["S02.5"]  # 치아파절
+        assert not kcd.match_kcd_code("S025", prefixes, excluded)
+        assert not kcd.match_kcd_code("S02.5", prefixes, excluded)
+        assert kcd.match_kcd_code("S020", prefixes, excluded)  # 두개골절은 계속 보장
+
     def test_missing_prefixes(self) -> None:
         codes = {"S72.0": {}, "S72.1": {}, "T30": {}}
         assert kcd.missing_prefixes(["S72", "T3"], codes) == []

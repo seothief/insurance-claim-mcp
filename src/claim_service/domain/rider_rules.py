@@ -5,6 +5,7 @@ Each branch is a deterministic rule from the standard catalog. No I/O happens he
 
 from typing import Any
 
+from claim_service.domain.kcd import match_kcd_code
 from claim_service.domain.models import ClaimInput, CoverageRule, PolicyOut, RiderOut
 from claim_service.domain.outcome import Outcome, make_outcome
 
@@ -66,12 +67,12 @@ def evaluate_rider(
         )
 
     if rule_id == "FRACTURE_DIAGNOSIS":
-        if any(kcd.startswith(ex) for ex in cfg["exclusion_kcd"]):
+        if match_kcd_code(kcd, cfg.get("exclusion_kcd", [])):
             return make_outcome(
                 policy, name, rule_id, "EXCLUDED", 0,
                 f"KCD 코드 '{kcd}'는 약관상 보장 제외 대상입니다.",
             )
-        if any(kcd.startswith(prefix) for prefix in cfg["target_kcd_prefixes"]):
+        if match_kcd_code(kcd, cfg.get("target_kcd_prefixes", [])):
             return make_outcome(
                 policy, name, rule_id, "ELIGIBLE", amount,
                 f"KCD 코드 '{kcd}'가 골절 보장 분류에 해당합니다.",
@@ -94,7 +95,7 @@ def evaluate_rider(
         return None
 
     if rule_id == "FLU_ANTIVIRAL":
-        kcd_match = any(kcd.startswith(prefix) for prefix in cfg["target_kcd_prefixes"])
+        kcd_match = match_kcd_code(kcd, cfg.get("target_kcd_prefixes", []))
         drugs_text_lower = " ".join(claim.prescribed_drugs).lower()
         drug_match = any(str(drug).lower() in drugs_text_lower for drug in cfg["antiviral_drugs"])
         if kcd_match or drug_match:
@@ -121,7 +122,7 @@ def evaluate_rider(
         return None
 
     if rule_id == "BURN_DIAGNOSIS":
-        if any(kcd.startswith(prefix) for prefix in cfg["target_kcd_prefixes"]):
+        if match_kcd_code(kcd, cfg.get("target_kcd_prefixes", [])):
             return make_outcome(
                 policy, name, rule_id, "ELIGIBLE", amount,
                 f"KCD 코드 '{kcd}'가 화상 보장 분류에 해당합니다.",

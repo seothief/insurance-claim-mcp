@@ -80,3 +80,36 @@ def codes_for_prefix(
     """Return master rows whose code starts with the given prefix (inclusive)."""
     normalized = normalize_code(prefix)
     return [row for row in codes if str(row["code"]).startswith(normalized)]
+def match_kcd_code(
+    kcd_code: str | None,
+    prefixes: Sequence[str],
+    excluded: Sequence[str] | None = None,
+) -> bool:
+    """True when ``kcd_code`` falls inside the given prefix ranges and is not excluded.
+
+    Both dot-less (``S720``) and dotted (``S72.0``) inputs are normalized first, so a
+    receipt written either way matches the same coverage rule. Exclusions take priority:
+    a code that starts with an excluded prefix never matches, even when it also starts
+    with an included prefix (e.g. ``S02.5`` 치아파절 excluded from 골절 ``S02``).
+
+    Invalid codes simply do not match (no exception is raised).
+    """
+    if not kcd_code:
+        return False
+    try:
+        normalized = normalize_code(kcd_code)
+    except ValueError:
+        return False
+    for raw in excluded or []:
+        try:
+            if normalized.startswith(normalize_code(raw)):
+                return False
+        except ValueError:
+            continue
+    for raw in prefixes:
+        try:
+            if normalized.startswith(normalize_code(raw)):
+                return True
+        except ValueError:
+            continue
+    return False

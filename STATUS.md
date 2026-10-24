@@ -13,7 +13,8 @@
   - 신설: `scripts/load_kcd.py` — 인코딩 자동 감지·헤더 자동 감지·`--replace`·`--verify-rule-configs`(catalog KCD 참조 대조) 지원. 적재된 `kcd_codes`는 SQLite(`*.db`)로 커밋 제외.
   - 신설: `tests/test_kcd.py` — 코드 파싱·리포지토리·catalog KCD 참조 검증
 - 데이터 조사 결과(검증된 사실): KCD(한국표준질병·사인분류) 전체 코드는 통계청 표준분류/KOICD(엑셀 다운로드)와 HIRA 상병마스터(공공데이터포털 파일)로 공개 제공됨(대분류 22·소분류 2,093·세분류 12,603·세세분류 6,335 등). 자동 다운로드 API는 로그인/키가 필요하고 GitHub 공개 데이터셋은 없어, 원본 파일은 공식 사이트에서 수동 다운로드 후 적재함.
-- 검증: `pytest -q` 60 passed, `ruff check src tests scripts` 통과, `mypy src` 27개 파일 통과(신규 로더는 `MYPYPATH=src` 하에서 통과).
+- 검증: `pytest -q` 62 passed, `ruff check src tests scripts` 통과, `mypy src` 27개 파일 통과(신규 로더는 `MYPYPATH=src` 하에서 통과).
+- **담보 규칙 리팩터링(②, `feat/kcd-master`)**: `rider_rules.py`의 KCD 판정을 하드코딩 문자열 매칭(`startswith`)에서 `domain.kcd.match_kcd_code` 기반으로 교체. 점 유무(`S72.0`/`S720`)와 무관하게 동일 판정하고, 제외 코드(치아파절 `S02.5`)가 우선 적용됨. 실제 마스터(21,299코드)와 연계 스모크 검증 완료(골절·화상·독감 판정 정상, 치아파절 제외 정상).
 - 미커밋 일회성 파일 4개 삭제: 운영 DB 정리 일회성 스크립트(`scripts/prune_users.py`, `scripts/review_accounts.py`)와 아키텍처 인포그래픽(html/png) 2개. 모두 git에 추적되지 않던 파일로, 사용자 결정에 따라 삭제함. Git 히스토리 변경 없음.
 - 삭제 후 `git status --short --branch` 상 추적되지 않은 파일 없음. 작업 트리 깨끗함(`main...origin/main` 동기화 상태 유지).
 
