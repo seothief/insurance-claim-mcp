@@ -6,6 +6,8 @@
 
 - **KCD 작업 계열 `main` 통합·푸시 완료(실행 결과)**: KCD 표준 코드 마스터(①)·담보 규칙 KCD 참조(②)·특약별 약관 규칙 귀속(③) 5커밋을 `origin/main` 위로 **rebase**한 뒤 `main`에 fast-forward 병합, `git push origin main` 완료(`75c0bac..9749e96`). rebase 중 충돌 3건(STATUS.md 기록 병합, repository.py import 블록, engine.py user_api_keys/rule_config_override 마이그레이션 병합)을 양쪽 모두 보존 방향으로 해결. 원격 작업(2026-10-23, per-user API key 인증 전환)과의 통합 검증: `pytest -q` **71 passed**, `ruff`·`mypy` 통과.
 - **KCD 전체 적재 완료(검증된 사실)**: 공공데이터포털 "건강보험심사평가원_상병마스터"(`건강보험심사평가원_상병마스터_20250930.csv`, CP949 인코딩, 47,798행)를 `scripts/load_kcd.py --replace`로 로컬 DB `kcd_codes`에 적재함. **21,299개 코드**(3단 2,085 · 4단 12,503 · 5단 6,711, 대분류 A~Z 26개 전부). catalog의 하드코딩 KCD 참조(골절 S02~S92, 독감 J09~J11, 화상 T20~T32)가 전부 공식 마스터에 존재함을 대조 검증(`RULE_CONFIG_MISSING_PREFIXES=0`).
+- **브랜치 정리 완료(실행 결과)**: main에 병합 완료된 로컬 브랜치 4개(`feat/kcd-master`, `feat/disable-synthetic-seed`, `feat/per-user-api-keys`, `feat/policy-management-db`)와 미병합 옛 브랜치 `feat/policy-collection-guidance`를 삭제함. 백업 태그 `backup/pre-cleanup-2026-10-22`는 유지. 이제 로컬 브랜치는 `main`만 남음.
+- **설계 결정(배포 KCD 적재 전략)**: 현재 계산 로직(`match_kcd_code`)은 KCD 마스터를 직접 참조하지 않아 배포 DB에 KCD가 없어도 정상 동작함. KCD 마스터를 계산에 직접 참조하는 시점에 **옵션 A(상병마스터 CSV를 리포지토리 포함 → 이미지 COPY → `init_runtime`이 비어 있을 때만 적재)** 로 전환 예정. 공공데이터 이용허락·출처 표기 확인 대기.
 - **데이터 포맷 발견(검증된 사실)**: HIRA 상병마스터는 **점 없는 코드**(`S720`)를 쓰고, **숫자 자리수 = 분류 단계**(숫자2=3단, 3=4단, 4~5=5단)다. 이에 맞춰 `domain/kcd.py`의 정규화를 **점 없는 표준형**으로 확장함(`S72.0`→`S720`). 점 있는 KCD 공식 표기 입력도 동일 코드로 조회되도록 함. 인코딩은 UTF-8(BOM)·CP949·EUC-KR 자동 감지로 확장.
 - KCD 표준 코드 마스터 인프라 구축(`feat/kcd-master`): 보험 계산의 "공통 언어"(진료 코드 판정)를 하드코딩에서 공식 표준 분류 기반으로 전환하기 위한 기반 작업.
   - 신설: `kcd_codes` 테이블(`src/claim_service/db/tables.py`) — 코드·대분류·분류단계·한글명·영문명·출처버전·`verified`
