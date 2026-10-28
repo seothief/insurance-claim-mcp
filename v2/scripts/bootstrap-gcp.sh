@@ -65,7 +65,7 @@ POOL=insurance-claim-v2
 PROVIDER=github-v2
 gcloud iam workload-identity-pools describe "$POOL" --location global "${scope[@]}" >/dev/null 2>&1 || \
   gcloud iam workload-identity-pools create "$POOL" --location global "${scope[@]}" --quiet
-condition="assertion.repository=='$REPOSITORY' && assertion.ref=='refs/heads/v2' && assertion.sub=='repo:$REPOSITORY:environment:v2-production'"
+condition="assertion.repository=='$REPOSITORY' && assertion.ref=='refs/heads/v2' && assertion.environment=='v2-production'"
 if ! gcloud iam workload-identity-pools providers describe "$PROVIDER" \
   --workload-identity-pool "$POOL" --location global "${scope[@]}" >/dev/null 2>&1; then
   gcloud iam workload-identity-pools providers create-oidc "$PROVIDER" \

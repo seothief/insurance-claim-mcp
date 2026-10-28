@@ -53,7 +53,7 @@ def test_v2_container_compose_and_source_are_independent() -> None:
         assert "import claim_service" not in source.read_text()
     bootstrap = (V2 / "scripts/bootstrap-gcp.sh").read_text()
     assert "projects add-iam-policy-binding" not in bootstrap
-    assert "refs/heads/v2" in bootstrap and "environment:v2-production" in bootstrap
+    assert "refs/heads/v2" in bootstrap and "assertion.environment=='v2-production'" in bootstrap
 
 
 def test_neon_uri_requires_v2_and_certificate_verification() -> None:
@@ -68,6 +68,29 @@ def test_neon_uri_requires_v2_and_certificate_verification() -> None:
     ]:
         with pytest.raises(ValueError):
             script.verified_uri(bad)
+
+
+def test_oidc_preflight_checks_explicit_environment_without_requiring_subject_format() -> None:
+    script = load_script("check_oidc")
+    claims = {
+        "repository": "seothief/insurance-claim-mcp", "ref": "refs/heads/v2",
+        "environment": "v2-production", "sub": "a-provider-defined-subject",
+    }
+    script.validate_claims(claims)
+    for key in ["repository", "ref", "environment"]:
+        with pytest.raises(ValueError):
+            script.validate_claims({**claims, key: "unexpected"})
+
+
+def test_oidc_request_credential_is_not_forwarded_on_redirect() -> None:
+    script = load_script("check_oidc")
+    request = script.urllib.request.Request(
+        "https://example.actions.githubusercontent.com/oidc",
+        headers={"Authorization": "Bearer synthetic-request-token"},
+    )
+    assert script.RejectRedirect().redirect_request(
+        request, None, 302, "Found", {}, "https://untrusted.example/collect",
+    ) is None
 
 
 def test_neon_never_auto_creates_without_operator_flag(tmp_path: Path) -> None:

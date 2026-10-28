@@ -2,6 +2,16 @@
 
 최종 갱신: 2026-10-28
 
+## V2 원격 CI 통과·OIDC 배포 조건 보완 (2026-10-28)
+
+- 사용자 승인으로 V2 변경을 커밋 `0ab1675`로 게시함. 원격 `v2`만 새로 만들었고 `main`은 기존 `6736a02` 그대로임.
+- GitHub 실행 `40641503010`: **ci / test, ci / container 통과**. 실제 GitHub 러너에서 frozen 설치·Ruff·mypy·SQLite/PostgreSQL 시험·컨테이너 빌드·migration·인증 MCP smoke를 확인함.
+- `v2` 브랜치에 force push/삭제 금지·PR 검토·CI check 정책을 설정함. 관리자 비상 우회는 유지하지만 production 환경은 별도 사용자 승인이 필수임. V1/main 보호 규칙은 변경하지 않음.
+- 사용자가 첫 배포를 승인했으나 `google-github-actions/auth`에서 GCP provider attribute condition 거부로 중단됨. 앱 이미지 게시·운영 migration·트래픽 전환 이전에 중단됐으며 V1을 수정하지 않음.
+- 기본 GitHub subject 설정과 V2 provider issuer/mapper를 확인함. 고정 `sub` 문자열 의존을 제거하고 **repository·ref·environment를 각각 정확히 확인**하는 조건으로 V2 provider만 보완함. 서명·issuer·audience 검증은 GCP가 계속 수행함.
+- 새 배포 전 OIDC 사전점검은 repository/ref/environment/sub 식별 정보만 출력하고 JWT·요청 토큰은 출력하지 않음. 이는 GCP의 실제 서명 검증을 대체하지 않으며, 새 실행에서 실제 claim과 인증 성공을 확인해야 함.
+- 보완 후 로컬 V2 **30 passed, 1 skipped**, Ruff·actionlint 통과. 독립 검토의 OIDC 요청 리다이렉트 위험도 반영해 Authorization 헤더를 다른 위치로 전달하지 않도록 리다이렉트를 거부하고 회귀 시험을 추가함. 아직 V2 앱 배포가 완료됐다고 주장하지 않음.
+
 ## V2 클라우드 리소스·배포 환경 실제 설정 (2026-10-28)
 
 - 사용자의 운영자 로그인 후 GCP bootstrap 권한과 GitHub 저장소 접근을 재확인함. Neon은 개인 키에 필요한 `org_id` 누락이 원인이었으며, 조직 1개(Free)를 확인해 명시적으로 지정함. 키를 다시 받거나 출력하지 않음.

@@ -136,7 +136,7 @@ GitHub에 DB URL이나 Neon API token을 복사할 필요는 없다. Cloud Run�
 
 1. V2 전용 frozen lock 설치·Ruff·mypy·SQLite/PostgreSQL 테스트를 실행한다.
 2. 별도 Compose 컨테이너에서 migration→준비 확인→키 발급→인증된 MCP 호출을 검사한다. 합성 CI 자격만 보호된 임시 파일에 저장한다.
-3. `v2-production` 승인 후 OIDC로 V2 deployer를 가장한다.
+3. `v2-production` 승인 후 OIDC의 repository/ref/environment를 사전 확인하고 V2 deployer를 가장한다. JWT 원문은 로그에 남기지 않으며 실제 서명·issuer·audience 검증은 GCP가 수행한다. Provider는 고정 `sub` 형식 대신 명시적인 repository·ref·environment claim을 각각 제한한다.
 4. `v2` build context만 빌드하고 V2 Artifact Registry에 푸시한다. 실제 배포에는 이미지 digest를 사용한다.
 5. migration Job은 migration 전용 SA·DB 비밀로 명시적 migration을 실행한다. V1/미소유 DB·다른 프로젝트 표식은 거부한다. 별도 점검 키의 해시를 합성 workspace에 등록/확인하고 유효기간을 90일로 갱신한다. 폐기된 키·비활성 계정은 자동 활성화하지 않는다.
 6. 새 앱 revision을 **트래픽 0%**와 candidate tag로 배포한다. runtime SA에는 현재 인프라 도구에 필요한 SELECT만 허용한다.
