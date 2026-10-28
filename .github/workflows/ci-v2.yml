@@ -1,0 +1,76 @@
+name: CI V2
+
+on:
+  workflow_call:
+  push:
+    branches: ["feat/v2-**"]
+    paths: ["v2/**", ".github/workflows/*-v2.yml"]
+  pull_request:
+    paths: ["v2/**", ".github/workflows/*-v2.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: insurance_claim_v2
+          POSTGRES_USER: claim_v2
+          POSTGRES_PASSWORD: ci_v2_only
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U claim_v2 -d insurance_claim_v2"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    defaults:
+      run:
+        working-directory: v2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.9.7"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: v2/uv.lock
+      - run: uv sync --frozen --extra dev
+      - run: uv run --frozen ruff check src tests scripts
+      - run: uv run --frozen mypy src
+      - name: SQLite tests
+        run: uv run --frozen pytest -q
+      - name: PostgreSQL tests (disposable V2 database only)
+        run: uv run --frozen pytest -q
+        env:
+          V2_TEST_DATABASE_URL: postgresql+psycopg://claim_v2:ci_v2_only@127.0.0.1:5433/insurance_claim_v2
+      - name: Validate infrastructure scripts
+        run: |
+          bash -n scripts/bootstrap-gcp.sh
+          bash -n scripts/deploy.sh
+
+  container:
+    runs-on: ubuntu-latest
+    needs: test
+    defaults:
+      run:
+        working-directory: v2
+    env:
+      V2_POSTGRES_PASSWORD: ci_v2_compose_only
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build isolated V2 container, migrate and start
+        run: docker compose -f compose.yml up -d --build --wait app-v2
+      - name: Verify public boundaries and authenticated MCP
+        run: |
+          set -euo pipefail
+          umask 077
+          docker compose -f compose.yml exec -T app-v2 python -m claim_mcp_v2.admin bootstrap \
+            --workspace-name ci-v2 --actor-name ci-v2 > "$RUNNER_TEMP/v2-smoke.credentials.json"
+          python3 scripts/smoke.py --url http://127.0.0.1:8082 --version local-v2 \
+            --key-file "$RUNNER_TEMP/v2-smoke.credentials.json"
+      - name: Tear down only disposable V2 containers and volumes
+        if: always()
+        run: docker compose -f compose.yml down -v

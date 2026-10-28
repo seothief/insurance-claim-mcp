@@ -1,0 +1,66 @@
+name: Deploy V2 to Cloud Run
+
+# Push-triggered on the dedicated release branch; never main/workflow_run.
+on:
+  push:
+    branches: [v2]
+    paths: ["v2/**", ".github/workflows/*-v2.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-insurance-claim-mcp-v2
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    if: github.ref == 'refs/heads/v2'
+    uses: ./.github/workflows/ci-v2.yml
+  deploy:
+    if: github.ref == 'refs/heads/v2'
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: v2-production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      V2_GCP_PROJECT_ID: ${{ vars.V2_GCP_PROJECT_ID }}
+      V2_GCP_REGION: ${{ vars.V2_GCP_REGION }}
+      V2_NEON_PROJECT_ID: ${{ vars.V2_NEON_PROJECT_ID }}
+      V2_DATABASE_SECRET_VERSION: ${{ vars.V2_DATABASE_SECRET_VERSION }}
+      V2_MIGRATION_SECRET_VERSION: ${{ vars.V2_MIGRATION_SECRET_VERSION }}
+      V2_SMOKE_SECRET_VERSION: ${{ vars.V2_SMOKE_SECRET_VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check V2-only configuration before cloud authentication
+        run: |
+          set -euo pipefail
+          test -n "$V2_GCP_PROJECT_ID"
+          test -n "$V2_GCP_REGION"
+          test -n "$V2_NEON_PROJECT_ID"
+          [[ "$V2_DATABASE_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
+          [[ "$V2_MIGRATION_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
+          [[ "$V2_SMOKE_SECRET_VERSION" =~ ^[1-9][0-9]*$ ]]
+          expected="claim-v2-deployer@${V2_GCP_PROJECT_ID}.iam.gserviceaccount.com"
+          test "$V2_DEPLOY_ACCOUNT" = "$expected"
+        env:
+          V2_DEPLOY_ACCOUNT: ${{ secrets.V2_GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.V2_GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.V2_GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Build and push only the V2 build context
+        run: |
+          set -euo pipefail
+          gcloud auth configure-docker "$V2_GCP_REGION-docker.pkg.dev" --quiet
+          image="$V2_GCP_REGION-docker.pkg.dev/$V2_GCP_PROJECT_ID/insurance-claim-v2/server:$GITHUB_SHA"
+          docker build -f v2/Dockerfile -t "$image" v2
+          docker push "$image"
+          digest=$(docker inspect "$image" --format '{{index .RepoDigests 0}}')
+          echo "V2_IMAGE=$digest" >> "$GITHUB_ENV"
+      - name: Migrate, validate a candidate, then promote V2 traffic
+        run: bash v2/scripts/deploy.sh

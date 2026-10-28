@@ -1,6 +1,85 @@
 # 진행 현황
 
-최종 갱신: 2026-10-24
+최종 갱신: 2026-10-28
+
+## V2 클라우드 리소스·배포 환경 실제 설정 (2026-10-28)
+
+- 사용자의 운영자 로그인 후 GCP bootstrap 권한과 GitHub 저장소 접근을 재확인함. Neon은 개인 키에 필요한 `org_id` 누락이 원인이었으며, 조직 1개(Free)를 확인해 명시적으로 지정함. 키를 다시 받거나 출력하지 않음.
+- GitHub 환경 생성의 실제 403 응답에서 `administration=write` 누락을 확인했고, 사용자가 기존 토큰 권한을 보완한 뒤 환경 생성에 성공함. 별도 `v2` 브랜치 커밋·게시와 CI/CD 검증도 사용자에게 명시적으로 승인받음.
+- **실제 생성:** Cloud Run `insurance-claim-mcp-v2`·migration Job, 전용 Artifact Registry, runtime/migrator/deployer 서비스 계정, DB/점검 비밀 3개, V2 WIF pool/provider와 리소스 단위 IAM. 이 시점의 서버는 아직 비밀 없는 placeholder이며 업무 서버 배포 완료가 아님.
+- **실제 생성:** Neon 별도 프로젝트 `divine-scene-58993737`, DB `insurance_claim_v2`, SQL로 생성한 제한된 앱 역할. V2 이름의 프로젝트가 1개뿐임을 확인함. 기존 V1 프로젝트/DB는 변경하지 않음.
+- runtime/migration DB URI 및 합성 배포 점검 키를 각각 GCP 비밀 버전 **1**로 저장함. GitHub에는 DB URL·Neon API 키를 복사하지 않고 숫자 버전과 WIF 참조만 설정함.
+- GitHub `v2-production` 환경에 필수 사용자 승인, `v2` 브랜치만 허용하는 정책, V2 변수 6개와 WIF 참조 비밀 2개를 실제 설정함. `main`과 V1 워크플로는 변경하지 않음.
+- 실제 Neon 초기화 중 일시적 423 잠금을 확인해 프로젝트 생성 자체는 재시도하지 않고 하위 잠금 응답만 제한 재시도하도록 보완함. 프로젝트 ID private 상태 기록의 `Path.open(opener=...)` 오류를 수정하고 회귀 시험을 추가함.
+- 실제 libpq 연결에서 `sslrootcert=system`의 CA 경로 차이로 검증 실패를 확인함. `/etc/ssl/certs/ca-certificates.crt`를 명시해 `verify-full` 접속을 확인했고 Docker 빌드도 해당 파일 존재를 검사하도록 보완함. 인증서/호스트 검증을 끄지 않음.
+- **V1 보호 확인:** 리소스 구성 전후 Cloud Run generation·준비 revision·트래픽 메타데이터가 동일함. V1 실행 코드·의존성·컨테이너·CI/배포 파일도 그대로 유지함.
+- 최신 로컬 시험: V2 **28 passed, 1 skipped**, Ruff·mypy·actionlint 통과. 실제 GitHub CI·V2 앱 migration/배포·후보/정식 URL 검증은 다음 단계에서 수행함.
+
+## V2 운영자 접근 설정 준비 (2026-10-28)
+
+- 사용자가 기존 GCP 프로젝트 `project-93d02748-0cbc-4596-902`에 V2 리소스를 분리하고, 같은 Linux 환경의 터미널에서 직접 로그인·비밀 입력할 수 있다고 확인함.
+- 읽기 전용 REST `testIamPermissions` 추가 진단: 현재 VM compute 서비스 계정의 오류는 **`ACCESS_TOKEN_SCOPE_INSUFFICIENT`**임. 앞선 IAM 부족 분류를 구체화/정정함. 이 VM 계정에 광범위한 역할을 추가하지 않고 별도 운영자 로그인으로 진행함.
+- GitHub CLI 2.103.3을 릴리스 checksum 확인 후 사용자 캐시에 설치함. 인증은 실행하지 않았고 기본 CLI·Git·VM 자격 설정은 유지함.
+- `v2/scripts/operator_access.py` 추가: 실제 터미널에서만 Google 브라우저 로그인 및 GitHub/Neon 임시 키 숨김 입력, V2 전용 CLI/Git 경로·0700/0600 비밀 저장, 민감 출력 없는 읽기 전용 접근 검사. 설정 파일은 저장소 외부 `~/.config/insurance-claim-v2/`에 저장하며 로컬 평문 보관임을 안내함.
+- 독립 검토에서 `gh auth login --insecure-storage`도 전역 키링에 영향을 줄 수 있다는 지적을 받아 해당 호출을 제거함. GitHub는 저장소 한정 임시 fine-grained 토큰을 직접 숨김 입력하고 명시적 `GH_TOKEN`으로만 사용하며, 키가 없을 때도 기존 키링으로 fallback하지 않도록 변경함.
+- 아직 사용자의 대화형 로그인·Neon 키 입력을 받지 않았으므로 환경 설정 완료나 클라우드 리소스 생성·배포 완료를 주장하지 않음. 도우미 실행 후 접근 권한을 재검증하고 필요한 설정만 추가 요청할 예정.
+- 도우미 테스트 추가 후 V2 SQLite **26 passed, 1 skipped**. V2 `ruff check src tests scripts`·`mypy src` 통과. 시스템 Python 3.10에서 도우미 `--help` 실행도 확인함. 새 보호 파일·환경 분리·기존 자격 보존 테스트는 합성 키만 사용했으며 실제 사용자 로그인을 수행하지 않음.
+
+## V2 독립 인프라 기반 구축 (2026-10-28)
+
+### 사용자 결정과 변경 범위
+
+- V1은 유지하고 V2용 새 서버·DB·배포 파이프라인을 별도로 구축하도록 요청받음. DB는 Neon 별도 프로젝트를 선택함. 앞선 동일 서버/DB 내 확장 제안보다 이 결정이 우선함.
+- 브랜치: `feat/v2-isolated-infrastructure`. 기존 미커밋 문서를 보존하며 진행. V1의 `src/`, `tests/`, `scripts/`, 루트 의존성·Dockerfile·Compose 및 기존 CI/Cloud Run 배포 워크플로는 수정하지 않음.
+
+### 구현한 사항 — 로컬 코드 기준
+
+- `v2/` 독립 Python 패키지·frozen `uv.lock`·비루트 컨테이너·Compose·테스트 추가. V1 모듈과 환경변수 `DATABASE_URL`/`APP_VERSION`/`.env`를 재사용하지 않음.
+- 별도 ASGI/FastMCP 서버: `/api/health`, `/api/ready`, `/api/version`, `/mcp`와 인증된 `get_workspace_context`. 고객·보험·예상액 계산 업무 도구는 아직 구현하지 않았고 V1로 fallback하지 않음.
+- 명시적 schema migration과 DB service/project/version 소유권 검사. V1 테이블·다른 프로젝트·미소유 DB를 거부하고 앱 시작 시 자동 migration하지 않음.
+- actor·workspace·membership·만료/폐기 키 분리. 서버에는 키 해시만 저장하며 요청별 identity 정리, 비활성 소속 거부, V1/위조 identity 헤더 차단 구현.
+- GCP bootstrap 스크립트: V2 전용 Cloud Run 서비스·migration Job·Artifact Registry·서비스 계정·DB 비밀·점검 키·WIF 구성. 배포 계정의 Cloud Run 권한은 V2 리소스에만 부여하며 V1 대상 명령은 없음. 실제 실행하지는 않음.
+- Neon 구축 스크립트: 별도 프로젝트/DB 생성·재개, SQL로 제한된 앱 역할 생성, owner/runtime DB 비밀 분리·직접 전달, 인증서 검증 TLS, 기존 자격 자동 회전 금지. 실제 Neon API를 호출하지는 않음.
+- 독립 CI 및 `v2` 브랜치/env 승인 기반 배포: 이미지 digest → migration Job → 0% candidate → 실제 인증 MCP/workspace 확인 → V2 트래픽 승격 → 정식 URL 재검사. 실패 시 기존 V2 트래픽 복구를 시도함. 실제 GitHub/Cloud Run 실행은 하지 않음.
+- `v2/README.md`, `docs/v2-deployment.md` 작성 및 기존 요구사항/계획에 독립 서버 결정을 반영함.
+
+### 실제 검증 결과
+
+- Python 3.12.12를 사용자 캐시의 격리된 uv 환경으로 준비함. 시스템 Python·V1 의존성/자격 설정은 변경하지 않음.
+- V1 회귀: `v2/.venv/bin/pytest -q`를 저장소 루트에서 실행, **71 passed**. `git diff --exit-code`로 V1 실행/배포 파일 무변경 확인.
+- V2 SQLite: **21 passed, 1 skipped**(PostgreSQL 전용 권한 시험). V2 PostgreSQL: 사용자 캐시의 일회성 PostgreSQL 16.2에서 **22 passed**. 운영 DB를 사용하지 않았으며 시험 서버는 종료함.
+- V2 `ruff check src tests scripts`, `mypy src` 통과. 새 GitHub 워크플로 2개는 actionlint 1.7.8 통과.
+- 실제 로컬 HTTP 시험: 명시적 migration·합성 점검 키 등록 후 Uvicorn에서 initialize·도구 열거·인증된 workspace 호출 통과. SQLite와 **별도 읽기 전용 PostgreSQL 앱 역할** 양쪽에서 확인함.
+- 오프라인 배포 제어 시험: migration/후보 실패 시 미승격, 정식 URL 실패 시 이전 V2 트래픽 복구 명령, 같은 SHA의 다른 workflow run revision 구분 확인.
+- 독립 검토의 인증된 배포 probe 누락·같은 SHA revision 충돌 지적을 보완했고, 재검토에서 해당 변경의 추가 blocker는 발견되지 않음. 이는 실제 클라우드 검증을 대체하지 않음.
+
+### 실제 인프라 적용의 남은 조건
+
+- 설정된 GCP 프로젝트의 Cloud Run 메타데이터 조회가 **IAM 권한 부족**으로 실패함. 인증·IAM·프로젝트를 자동 변경하지 않았으며 서비스/Job/비밀/WIF를 실제 생성하지 않음.
+- `NEON_API_KEY`가 없어 새 Neon 프로젝트·DB를 생성하지 않음. GitHub environment/보호 규칙/변수·비밀·원격 브랜치 설정, 커밋·푸시·실제 배포도 실행하지 않음.
+- 로컬 Docker가 없어 이미지 빌드·Compose는 미실행. 실제 Neon API·GCP IAM/WIF·Cloud Run 배포/롤백·상용 AI 앱 연결은 운영자 자격 설정 후 검증해야 함.
+- 다음 적용 절차는 `docs/v2-deployment.md` 참조. 고객 업무 기능의 출시에는 별도 권한·처리 근거·감사·호출 제한·자료 수명·규칙 검증 구현이 추가로 필요함.
+
+## 최신 진행 상황 (2026-10-28)
+
+### 사용자 확인 및 합의
+
+- 사용자가 실제 데이터 입력·MCP 연결·예상 보험금 산출까지 핵심 기능 검증을 완료했다고 확인함. 이번 문서 작업에서 해당 운영 결과를 재시험하지는 않음.
+- V2의 직접 이용자는 보험설계사·대리점이며, 각자가 사용하는 AI가 상담·문서 판독·업무 처리를 담당하고 본 프로젝트는 MCP 서비스만 전담함. 자체 UI·CRM·고객용 앱·업무 REST API는 초기 범위에서 제외함.
+
+### 코드 확인 및 설계 제안
+
+- 현재 키 소유자와 보험 가입자가 `user_id`로 결합되어 있고, 계약은 `(user_id, company, product_name)`로 업서트됨을 코드에서 확인함. V2는 호출자·업무 공간·고객·명시적 권한을 분리하고 복수 계약 식별을 추가하는 방향으로 제안함.
+- 현재 증권 출처 특약의 `rule_config_override`는 미검증 표준 규칙을 대체해 평가할 수 있음. V2에서는 출처 진술과 조건 검증을 분리하고, 미검토 override로 검증 게이트를 통과시키지 않는 요구사항을 명시함. 기존 엔진이나 데이터는 변경하지 않음.
+- `docs/v2-requirements.md` 작성: 합의된 범위, P0 요구사항·수용 기준, 새 MCP 계약 후보, 개인정보·권한·규칙 검증 및 출시 게이트. 제안된 V2 도구·경로는 아직 구현되지 않음.
+- `docs/v2-implementation-plan.md` 작성: V1 보존형 테이블·인증 분리, S0~S5 구현 계획, 필수 시험, 실제 AI 호환성 확인 및 이행·복구 전략. README에 설계 링크 추가.
+- 읽기 전용 독립 검토에서 README의 기존 Fail-Closed 설명이 override 예외를 누락한다는 지적을 받음. 현재 구현의 예외와 클라이언트 제출 출처의 한계, V2 검증 강화가 미구현이라는 점을 README에 반영함.
+- 브랜치: `docs/v2-mcp-requirements`. 코드 확인 기준: `6736a02`.
+
+### 검증 및 미실행 범위
+
+- 문서 검증: `git diff --check` 통과. 변경 문서 4개의 UTF-8·파일 끝 개행·코드 펜스·공백 및 로컬 링크 11개 확인, 새 설계 문서의 Markdown 표 10개 열 수 일치 확인. V2 구현·DB 이행·키 발급·운영 배포는 실행하지 않음.
+- 현재 로컬 Python은 3.10.12로 프로젝트 요구사항(`>=3.12`)에 미달함. 이번 작업은 문서만 변경하며 Python 테스트·Ruff·mypy 실행 결과를 주장하지 않음.
 
 ## 최신 진행 상황 (2026-10-24)
 
