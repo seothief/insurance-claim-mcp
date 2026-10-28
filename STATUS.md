@@ -2,6 +2,17 @@
 
 최종 갱신: 2026-10-28
 
+## V2 독립 인프라 실제 배포·최종 검증 완료 (2026-10-28)
+
+- 사용자 재승인 후 GitHub 실행 **[40642768811](https://github.com/seothief/insurance-claim-mcp/actions/runs/40642768811)**의 `ci / test`, `ci / container`, `deploy`가 모두 **success**임을 확인함. 배포 코드 커밋: `d98329b06a7599a296306bd7fa60e03b15c5ff31`.
+- 실제 OIDC 사전점검·Google WIF 인증·제한된 배포 계정의 이미지 게시·Cloud Run migration Job·Neon V2 schema 초기화·합성 점검 키 등록·0% 후보 검증·트래픽 승격·정식 URL 인증 MCP 검증까지 성공함. 별도 운영자 권한으로 배포를 우회하지 않음.
+- **V2 서비스:** `https://insurance-claim-mcp-v2-sg2qj3p5rq-du.a.run.app`, MCP `/mcp`. 준비 revision `insurance-claim-mcp-v2-d98329b06a75-40642768811-1`에 트래픽 **100%**.
+- 배포 이후 독립적으로 `/api/health`, `/api/ready`, `/api/version` 및 미인증 MCP 401을 확인함. 보호된 합성 키를 메모리 환경변수로만 공급해 initialize·도구 열거·`get_workspace_context`와 기대 workspace를 다시 확인함. 버전이 위 배포 SHA와 일치함.
+- 실제 Neon 앱 역할의 elevated flags와 `neon_superuser` membership이 모두 없으며, libpq의 클라이언트 SSL 활성 및 `verify-full` 접속을 확인함. 원문 키·DB 비밀번호는 대화/저장소/로그에 기록하지 않음.
+- **V1 최종 보호 확인:** 서비스 health 정상, 구성 전 저장한 generation·준비 revision·트래픽과 동일, 원격 `main` SHA는 `6736a020e9462668697e03ee6e7deeeea2fe7a43` 그대로임. V1 실행·의존성·컨테이너·기존 CI/배포 파일도 해당 기준과 동일함.
+- 범위는 **인프라·인증·MCP 연결 기반**까지임. 응답 `business_tools_available=false`이며 고객·보험 등록·보험금 평가 도구, 고객 자료 처리 권한·감사·호출 제한·보관/삭제 등은 후속 구현 대상임. 상용 AI 앱별 연결과 실제 장애를 유발하는 운영 rollback 시험은 이번에 수행하지 않음.
+- 완료 기록은 문서 변경으로만 게시하며, V2 배포 path filter에 해당하지 않아 추가 앱 배포를 요청하지 않음. 구축용 GitHub/Neon 임시 토큰의 폐기는 사용자가 결정하며 V1·기본 CLI 자격을 임의 폐기하지 않음.
+
 ## V2 원격 CI 통과·OIDC 배포 조건 보완 (2026-10-28)
 
 - 사용자 승인으로 V2 변경을 커밋 `0ab1675`로 게시함. 원격 `v2`만 새로 만들었고 `main`은 기존 `6736a02` 그대로임.

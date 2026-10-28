@@ -18,7 +18,7 @@
 
 GCP 프로젝트 자체는 기존 프로젝트를 명시적으로 선택할 수 있지만 리소스·서비스 계정·OIDC provider·비밀·저장소를 분리한다. 배포 계정에는 V2 서비스/Job 단위로만 Cloud Run 변경 권한을 부여한다. 프로젝트 전체 `run.admin`/`run.developer`는 부여하지 않는다.
 
-**구현된 것은 인프라 기반과 구축 코드다. 실제 클라우드 생성·배포는 별도 실행·검증이 필요하다.** V2는 현재 `get_workspace_context`만 제공하며 고객·보험·평가 도구는 아직 없다. Cloud Run 준비 확인 성공도 업무 기능·약관 검증 완료를 의미하지 않는다.
+**독립 인프라의 실제 생성·배포와 인증 MCP 검증을 완료했다.** V2는 현재 `get_workspace_context`만 제공하며 고객·보험·평가 도구는 아직 없다. Cloud Run 준비 확인 성공도 업무 기능·약관 검증 완료를 의미하지 않는다. 최종 배포·검증 기록은 8절을 참조한다.
 
 ## 2. 운영자 사전 준비
 
@@ -163,9 +163,11 @@ uv run --frozen python scripts/smoke.py --url '<새 V2 서비스 HTTPS URL>' \
 
 현재 업무 도구가 없으므로 실제 고객 데이터를 넣지 않는다. 고객 접근 권한·자료 처리 근거·감사·호출 제한·보관/삭제 및 지급 조건 검증 구현이 완료되기 전에는 다고객 업무 서비스를 출시하지 않는다.
 
-## 8. 이번 환경에서의 미완료 항목
+## 8. 실제 배포·검증 결과와 남은 범위
 
 - 사용자 운영자 로그인과 GitHub 토큰 권한 보완 후 GCP V2 리소스, Neon 별도 프로젝트/DB/앱 역할, 비밀 버전 및 GitHub 환경/승인/변수·WIF 참조 설정을 실제 완료했다. 개인 Neon 키에는 조직 ID를 명시한다.
 - 초기 VM 계정의 scope 문제를 해결하려고 기본 자격을 변경하거나 광범위한 역할을 추가하지 않았다. V2 전용 사용자 로그인 설정을 사용한다.
-- 로컬 Docker가 없어 이미지 빌드/Compose는 원격 CI에서 확인해야 한다. 생성된 placeholder를 V2 앱으로 교체하고 GitHub OIDC·제한된 배포 IAM·실제 migration·후보/정식 URL을 검증해야 한다.
+- GitHub 실행 [40642768811](https://github.com/seothief/insurance-claim-mcp/actions/runs/40642768811)에서 테스트·컨테이너·배포가 모두 성공했다. 이미지 빌드/Compose·인증 MCP는 원격 CI에서 실제 확인했고, GitHub OIDC·제한된 배포 IAM·Neon migration·후보 및 정식 URL 검증을 완료했다.
+- MCP URL: `https://insurance-claim-mcp-v2-sg2qj3p5rq-du.a.run.app/mcp`. 배포 코드 `d98329b06a7599a296306bd7fa60e03b15c5ff31`, 준비 revision `insurance-claim-mcp-v2-d98329b06a75-40642768811-1`, 트래픽 100%를 확인했다.
+- V1 서비스 health·revision·트래픽과 `main` SHA·기존 실행/배포 파일은 구성 전후 동일하다. 고객 업무 도구·상용 AI 앱별 연결·운영 장애 rollback 시험은 후속 범위다.
 - 테스트·린트·타입 검사 및 V1 보호 확인의 실제 결과는 [STATUS](../STATUS.md)에 기록한다.

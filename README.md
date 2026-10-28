@@ -29,9 +29,10 @@
 - [V2 요구사항](docs/v2-requirements.md): 서비스 경계, 고객별 권한, MCP 계약, 검증·개인정보 및 출시 조건
 - [V2 전환 설계 및 구현 계획](docs/v2-implementation-plan.md): 데이터·인증 분리, 단계별 구현·시험, 기존 이용자 보호
 
-V2는 **별도 서버·Neon 별도 프로젝트·배포 파이프라인**으로 분리합니다. 현재 `v2/`에는 독립 인프라 기반만 구현했으며 고객·보험·평가 업무 도구와 운영 배포는 아직 완료하지 않았습니다. V1 실행 코드·DB·배포 워크플로는 변경하지 않았습니다.
+V2는 **별도 서버·Neon 별도 프로젝트·배포 파이프라인**으로 분리했습니다. 독립 인프라의 실제 배포·DB migration·인증 MCP 검증을 완료했으며, 현재는 `get_workspace_context`만 제공합니다. 고객·보험·평가 업무 도구는 후속 구현 대상입니다. V1 실행 코드·DB·배포 워크플로는 변경하지 않았습니다.
 
 - [V2 로컬 실행](v2/README.md) · [V2 클라우드 구축·배포](docs/v2-deployment.md)
+- V2 MCP: `https://insurance-claim-mcp-v2-sg2qj3p5rq-du.a.run.app/mcp` (V2 전용 키 필요)
 
 ## 로컬 실행
 
