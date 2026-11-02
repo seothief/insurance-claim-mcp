@@ -66,7 +66,7 @@ mcp-publisher publish
 PyPI는 계정 비밀번호로는 업로드를 받지 않습니다. 사용자 이름을 물으면 `__token__`을 입력합니다.
 README의 `mcp-name: io.github.seothief/insurance-claim-mcp` 줄은 MCP Registry가 PyPI 소유권을 확인하는 데 쓰므로 지우지 않습니다.
 
-## 3. Agensi.io (무료 스킬)
+## 2. Agensi.io (무료 스킬)
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\build_agensi_zip.py
