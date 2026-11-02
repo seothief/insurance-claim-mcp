@@ -74,7 +74,9 @@ class TestKcdRepository:
     def _repo(self, tmp_path: Path) -> PolicyRepository:
         engine = create_db_engine(database_url_for(tmp_path, "kcd_test.db"))
         init_schema(engine)
-        return PolicyRepository(engine)
+        repo = PolicyRepository(engine)
+        repo.clear_kcd_codes()
+        return repo
 
     def test_upsert_and_query(self, tmp_path: Path) -> None:
         repo = self._repo(tmp_path)
@@ -140,6 +142,7 @@ class TestCatalogKcdReferences:
         engine = create_db_engine(database_url_for(tmp_path, "kcd_catalog_test.db"))
         init_schema(engine)
         repo = PolicyRepository(engine)
+        repo.clear_kcd_codes()
 
         # Representative KCD rows for every prefix referenced by the catalog rules.
         rows: list[dict[str, object]] = []
