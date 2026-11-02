@@ -21,29 +21,50 @@ Cloud Run 원격 서버(`/mcp`)는 운영자가 발급한 키가 있어야 하�
 
 버전을 올릴 때는 `pyproject.toml`의 `version`과 `server.json`의 `version`, `packages[0].version`을 같이 바꿉니다.
 
-## 1. PyPI
+## 1. 자동 게시 (PyPI + MCP Registry)
 
-PyPI 계정과 API 토큰이 필요합니다(본인이 발급).
+`v*` 태그를 push하면 `.github/workflows/publish.yml`이 빌드 → PyPI → 공식 MCP Registry 순서로 게시합니다.
+PyPI는 Trusted Publishing, MCP Registry는 GitHub OIDC를 쓰므로 토큰이나 로그인이 필요 없습니다.
+
+### 최초 1회: PyPI에 신뢰 게시자 등록
+
+PyPI → 내 프로젝트 → `insurance-claim-mcp` → **관리(Manage)** → **게시(Publishing)** → GitHub 게시자 추가:
+
+| 항목 | 값 |
+|---|---|
+| Owner | `seothief` |
+| Repository name | `insurance-claim-mcp` |
+| Workflow name | `publish.yml` |
+| Environment name | `pypi` |
+
+GitHub 쪽 `pypi` 환경은 만들어져 있고, `v*` 태그에서만 배포되도록 제한돼 있습니다.
+
+### 릴리스할 때마다
+
+1. `pyproject.toml`의 `version`, `server.json`의 `version`과 `packages[0].version`을 같은 값으로 올리고 main에 머지
+2. 태그 push
+
+```powershell
+git switch main
+git pull
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+태그와 두 파일의 버전이 다르면 build 단계에서 멈춥니다. 진행 상황은 GitHub **Actions → Publish**에서 볼 수 있습니다.
+확인: https://pypi.org/project/insurance-claim-mcp/ , `https://registry.modelcontextprotocol.io/v0/servers?search=insurance-claim-mcp`
+
+### 수동 게시 (자동 게시가 안 될 때만)
 
 ```powershell
 uv build
-uv publish            # 토큰 입력 또는 UV_PUBLISH_TOKEN 환경변수
+uv publish --token <PyPI API 토큰>
+mcp-publisher login github
+mcp-publisher publish
 ```
 
-설치 확인: 새 폴더에서 `uvx insurance-claim-mcp` 실행 후 `Starting MCP server ... stdio` 로그가 보이면 정상입니다.
+PyPI는 계정 비밀번호로는 업로드를 받지 않습니다. 사용자 이름을 물으면 `__token__`을 입력합니다.
 README의 `mcp-name: io.github.seothief/insurance-claim-mcp` 줄은 MCP Registry가 PyPI 소유권을 확인하는 데 쓰므로 지우지 않습니다.
-
-## 2. 공식 MCP Registry
-
-PyPI 게시가 끝난 뒤 진행합니다. [mcp-publisher](https://github.com/modelcontextprotocol/registry/releases)를 설치합니다.
-
-```powershell
-mcp-publisher login github     # 브라우저에서 seothief 계정으로 승인
-mcp-publisher publish          # 저장소 루트의 server.json 사용
-```
-
-확인: `https://registry.modelcontextprotocol.io/v0/servers?search=insurance-claim-mcp`
-등록되면 PulseMCP 등 레지스트리를 미러링하는 디렉터리에도 순차 반영됩니다.
 
 ## 3. Agensi.io (무료 스킬)
 
