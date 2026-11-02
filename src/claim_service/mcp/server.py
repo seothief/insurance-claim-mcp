@@ -13,6 +13,7 @@ from claim_service.domain.models import (
     ResolvableStatus,
     RiderIn,
     RiderResolve,
+    SourceType,
     UserIn,
 )
 from claim_service.domain.security import get_bound_user
@@ -166,9 +167,16 @@ def register_user_policy(
     silson_generation: int | None = None,
     enrolled_year: int | None = None,
     replace_riders: bool = False,
+    source_type: SourceType = "USER_STATED",
+    issuer: str | None = None,
+    issued_on: str | None = None,
     pin: str | None = None,
 ) -> dict[str, object]:
-    """보험을 등록하거나 갱신합니다. 미매핑 특약은 resolve_user_rider로 확정하세요."""
+    """보험을 등록하거나 갱신합니다. 미매핑 특약은 resolve_user_rider로 확정하세요.
+
+    source_type: 보험증권에서 읽은 계약이면 POLICY_CERTIFICATE와 issuer, issued_on(YYYY-MM-DD)을
+    함께 보냅니다. 계약과 특약 모두 POLICY_CERTIFICATE일 때만 계산됩니다.
+    """
     policy = PolicyIn(
         company=company,
         product_name=product_name,
@@ -177,6 +185,9 @@ def register_user_policy(
         enrolled_year=enrolled_year,
         riders=riders,
         replace_riders=replace_riders,
+        source_type=source_type,
+        issuer=issuer,
+        issued_on=issued_on,
     )
     return _guard(lambda: get_service().register_policy(user_id, policy, pin=pin).model_dump())
 
