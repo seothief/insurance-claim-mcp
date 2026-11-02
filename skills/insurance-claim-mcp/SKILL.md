@@ -40,6 +40,7 @@ Data stays on the user's machine (SQLite at `~/.insurance-claim-mcp/`). Source: 
 1. **Start** — when the user says "보험비서 시작" or asks to begin, call `get_onboarding_guide` and follow it.
 2. **Identify the user** — ask for a nickname (`user_id`) and a PIN of 4+ digits, then call `get_user_profile`; if the user does not exist, call `register_user`.
 3. **Register a policy** — from a policy certificate (보험증권) image, extract insurer, product name, enrollment year, 실손 generation, rider names and insured amounts (integer won). Summarize, confirm with the user, then call `register_user_policy`.
+   - Policy read from a certificate: pass `source_type=POLICY_CERTIFICATE`, `issuer` and `issued_on` on the policy itself **and** on each rider. Only then is anything calculated.
    - Riders read from a certificate: `source_type=POLICY_CERTIFICATE`, with `issuer` and `issued_on`.
    - Riders from anything else (reports, the user's memory): `source_type=USER_STATED`. Tell the user these are not calculated.
 4. **Resolve riders** — if the result has `unresolved_riders`, use its `ai_follow_up_prompt` to re-check the certificate or ask the user, then call `resolve_user_rider`. Use `update_user_rider` for later corrections.

@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.seothief/insurance-claim-mcp",
-  "title": "Insurance Claim Estimator (KR)",
-  "description": "Estimate Korean insurance payouts from medical receipts and KCD codes with a fail-closed rule engine",
-  "version": "0.1.0",
+  "title": "Insurance Claim Estimator (KR + US)",
+  "description": "Estimate insurance payouts (Korea riders, US supplemental plans) from bills and diagnosis codes",
+  "version": "0.2.0",
   "repository": {
     "url": "https://github.com/seothief/insurance-claim-mcp",
     "source": "github"
@@ -12,7 +12,7 @@
     {
       "registryType": "pypi",
       "identifier": "insurance-claim-mcp",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"

@@ -1,23 +1,30 @@
-"""Package skills/insurance-claim-mcp into dist/insurance-claim-mcp-skill.zip for Agensi upload.
+"""Package each folder under skills/ into dist/<skill>-skill.zip for Agensi upload.
 
-The zip holds a single top-level folder with SKILL.md at its root, as Agensi requires.
+Each zip holds a single top-level folder with SKILL.md at its root, as Agensi requires.
 """
 
 import zipfile
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SKILL_DIR = PROJECT_ROOT / "skills" / "insurance-claim-mcp"
-OUT = PROJECT_ROOT / "dist" / "insurance-claim-mcp-skill.zip"
+SKILLS_DIR = PROJECT_ROOT / "skills"
+DIST = PROJECT_ROOT / "dist"
+
+
+def build(skill_dir: Path) -> Path:
+    out = DIST / f"{skill_dir.name}-skill.zip"
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted(skill_dir.rglob("*")):
+            if path.is_file():
+                zf.write(path, Path(skill_dir.name) / path.relative_to(skill_dir))
+    return out
 
 
 def main() -> None:
-    OUT.parent.mkdir(exist_ok=True)
-    with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as zf:
-        for path in sorted(SKILL_DIR.rglob("*")):
-            if path.is_file():
-                zf.write(path, Path(SKILL_DIR.name) / path.relative_to(SKILL_DIR))
-    print(OUT)
+    DIST.mkdir(exist_ok=True)
+    for skill_dir in sorted(SKILLS_DIR.iterdir()):
+        if (skill_dir / "SKILL.md").is_file():
+            print(build(skill_dir))
 
 
 if __name__ == "__main__":

@@ -1,11 +1,22 @@
 {
-  "skill_folder": "skills/insurance-claim-mcp",
-  "zip": "dist/insurance-claim-mcp-skill.zip",
-  "title": "Insurance Claim Estimator (Korea)",
-  "listing_description": "Turn a Korean hospital receipt into an insurance payout estimate. Your agent reads policy certificates and receipts; the open-source insurance-claim-mcp server (MIT, runs locally via uvx) does the math with a fail-closed rule engine, so unverified riders return NOT_EVALUATED instead of a guess. Covers 실손 generations and common fixed-benefit riders, KCD code matching, and insurer document checklists. Estimates only, not a payout decision.",
-  "pricing": {
-    "type": "free"
-  },
-  "tags": ["mcp", "insurance", "korea", "kcd", "healthcare", "claims", "claude-code"],
-  "requires": "insurance-claim-mcp MCP server (uvx insurance-claim-mcp)"
+  "listings": [
+    {
+      "skill_folder": "skills/insurance-claim-mcp",
+      "zip": "dist/insurance-claim-mcp-skill.zip",
+      "title": "Insurance Claim Estimator (Korea)",
+      "listing_description": "Turn a Korean hospital receipt into an insurance payout estimate. Your agent reads policy certificates and receipts; the open-source insurance-claim-mcp server (MIT, runs locally via uvx) does the math with a fail-closed rule engine, so unverified riders return NOT_EVALUATED instead of a guess. Covers 실손 generations and common fixed-benefit riders, KCD code matching, and insurer document checklists. Estimates only, not a payout decision.",
+      "pricing": { "type": "free" },
+      "tags": ["mcp", "insurance", "korea", "kcd", "healthcare", "claims", "claude-code"],
+      "requires": "insurance-claim-mcp MCP server (uvx insurance-claim-mcp)"
+    },
+    {
+      "skill_folder": "skills/us-supplemental-claims",
+      "zip": "dist/us-supplemental-claims-skill.zip",
+      "title": "US Supplemental Insurance Claim Estimator",
+      "listing_description": "Find out what your hospital indemnity, accident or critical illness plan should pay. Your agent reads the plan's schedule of benefits and the hospital bill's ICD-10-CM codes; the open-source insurance-claim-mcp server (MIT, runs locally via uvx) calculates each benefit with a fail-closed rule engine: admission, daily and ICU confinement, critical illness lump sums, accident fracture schedules and ER benefits. Anything the schedule doesn't confirm comes back NOT_EVALUATED, never a guess. Estimates only, not a claim decision.",
+      "pricing": { "type": "free" },
+      "tags": ["mcp", "insurance", "hospital-indemnity", "critical-illness", "icd-10", "healthcare", "claude-code"],
+      "requires": "insurance-claim-mcp MCP server (uvx insurance-claim-mcp)"
+    }
+  ]
 }

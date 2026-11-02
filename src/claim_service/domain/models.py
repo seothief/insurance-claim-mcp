@@ -4,10 +4,24 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-PolicyType = Literal["SILSON", "COMPREHENSIVE", "FIXED_BENEFIT", "DENTAL", "DRIVER", "OTHER"]
+PolicyType = Literal[
+    "SILSON",
+    "COMPREHENSIVE",
+    "FIXED_BENEFIT",
+    "DENTAL",
+    "DRIVER",
+    "OTHER",
+    # US supplemental (fixed-benefit) coverage. Amounts are whole US dollars.
+    "US_HOSPITAL_INDEMNITY",
+    "US_ACCIDENT",
+    "US_CRITICAL_ILLNESS",
+]
+US_POLICY_TYPES: frozenset[str] = frozenset(
+    {"US_HOSPITAL_INDEMNITY", "US_ACCIDENT", "US_CRITICAL_ILLNESS"}
+)
 HospitalType = Literal["clinic", "hospital", "general"]
 BenefitStatus = Literal["ELIGIBLE", "EXCLUDED", "NOT_EVALUATED"]
-RuleCategory = Literal["INDEMNITY_SILSON", "FIXED_BENEFIT"]
+RuleCategory = Literal["INDEMNITY_SILSON", "FIXED_BENEFIT", "US_FIXED_BENEFIT"]
 MappingStatus = Literal["MAPPED", "NEEDS_CLARIFICATION", "CUSTOM", "IGNORED"]
 ResolvableStatus = Literal["MAPPED", "CUSTOM", "IGNORED"]
 OnboardingStatus = Literal["CREATED", "NEEDS_CLARIFICATION", "READY"]
@@ -154,6 +168,8 @@ class ClaimInput(BaseModel):
     """Values extracted from receipts/prescriptions. Used for one evaluation and never stored."""
 
     kcd_code: str | None = None
+    # US claims: ICD-10-CM diagnosis code from the itemized bill or discharge summary.
+    icd10_code: str | None = None
     treatment_name: str | None = None
     treatment_code: str | None = None
     cost_covered: int = Field(default=0, ge=0)
@@ -162,6 +178,7 @@ class ClaimInput(BaseModel):
     # None means the receipt/prescription did not establish this fact.
     is_inpatient: bool | None = None
     inpatient_days: int | None = Field(default=None, ge=0)
+    icu_days: int | None = Field(default=None, ge=0)
     is_injury: bool | None = None
     is_emergency: bool | None = None
     prescribed_drugs: list[str] = Field(default_factory=list)

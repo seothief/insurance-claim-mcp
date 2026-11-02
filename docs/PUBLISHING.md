@@ -6,7 +6,7 @@
 |---|---|---|
 | PyPI | 설치형 MCP 서버 (`uvx insurance-claim-mcp`) | `dist/*.whl`, `dist/*.tar.gz` |
 | 공식 MCP Registry | 서버 메타데이터 (PyPI 패키지를 가리킴) | `server.json` |
-| Agensi.io | 서버를 쓰는 방법을 담은 에이전트 스킬 (무료) | `dist/insurance-claim-mcp-skill.zip` |
+| Agensi.io | 서버를 쓰는 방법을 담은 에이전트 스킬 (무료, 한국판·미국판 2개) | `dist/insurance-claim-mcp-skill.zip`, `dist/us-supplemental-claims-skill.zip` |
 
 Agensi는 MCP 서버가 아니라 SKILL.md 묶음(zip)을 파는 스킬 마켓입니다. 스킬은 이 서버가 연결돼 있어야 동작합니다.
 Cloud Run 원격 서버(`/mcp`)는 운영자가 발급한 키가 있어야 하므로 공개 등록에는 넣지 않습니다.
@@ -52,8 +52,8 @@ mcp-publisher publish          # 저장소 루트의 server.json 사용
 ```
 
 1. https://www.agensi.io/sell 에서 판매자 가입
-2. `dist/insurance-claim-mcp-skill.zip` 업로드 (최상위 폴더 `insurance-claim-mcp/` 아래에 `SKILL.md`)
-3. 가격: Free, 태그·설명은 `agensi-listing.json`의 값 사용
+2. `dist/` 아래 zip 두 개를 각각 별도 스킬로 업로드 (zip마다 최상위 폴더 아래에 `SKILL.md`)
+3. 가격: Free, 제목·태그·설명은 `agensi-listing.json`의 `listings` 항목별 값 사용
 4. 자동 보안 스캔 → AI 검토 → 사람 검토(보통 24~48시간). 실패 시 사유를 고쳐 다시 올리면 됩니다.
 
 무료 스킬은 정산 계좌(Stripe/KYC)가 필요 없습니다.

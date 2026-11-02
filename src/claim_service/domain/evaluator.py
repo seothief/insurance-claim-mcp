@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from claim_service.domain.models import (
+    US_POLICY_TYPES,
     ClaimEvaluation,
     ClaimInput,
     CoverageRule,
@@ -15,6 +16,8 @@ from claim_service.domain.models import (
 )
 from claim_service.domain.outcome import Outcome, make_outcome
 from claim_service.domain.rider_rules import evaluate_rider
+from claim_service.domain.us_catalog import US_BASE_DOCUMENTS
+from claim_service.domain.us_rules import evaluate_us_rider
 
 DISCLAIMER = (
     "본 결과는 참고 정보이며 보험금 지급을 확정하지 않습니다. "
@@ -23,6 +26,10 @@ DISCLAIMER = (
 BASE_DOCUMENTS: tuple[str, ...] = (
     "진료비 계산서·영수증 (병원 원무과 발급)",
     "진료비 세부내역서 (급여/비급여 분리)",
+)
+US_DISCLAIMER = (
+    "Informational estimate only; this is not a claim decision. Benefits not confirmed by the "
+    "policy's schedule of benefits, and facts not shown on the bill, were not calculated."
 )
 
 
@@ -59,7 +66,8 @@ def evaluate_claim(
             if outcome is not None:
                 outcomes.append(outcome)
 
-    documents = list(BASE_DOCUMENTS)
+    us_only = bool(policies) and all(p.policy_type in US_POLICY_TYPES for p in policies)
+    documents = list(US_BASE_DOCUMENTS if us_only else BASE_DOCUMENTS)
     for outcome in outcomes:
         if outcome.result.status != "ELIGIBLE" or outcome.rule_id is None:
             continue
@@ -77,7 +85,7 @@ def evaluate_claim(
         required_documents=documents,
         pending_riders=pending,
         unverified_source_riders=unverified,
-        disclaimer=DISCLAIMER,
+        disclaimer=US_DISCLAIMER if us_only else DISCLAIMER,
     )
 
 
@@ -89,6 +97,7 @@ def _evaluate_rider(
 ) -> Outcome | None:
     if rider.mapping_status == "IGNORED":
         return None
+    is_us = policy.policy_type in US_POLICY_TYPES
     if rider.mapping_status == "CUSTOM":
         return make_outcome(
             policy,
@@ -96,7 +105,9 @@ def _evaluate_rider(
             None,
             "NOT_EVALUATED",
             0,
-            "커스텀 조건이 약관 원문으로 검증되지 않아 계산하지 않았습니다.",
+            "Custom conditions are not verified against the policy; not calculated."
+            if is_us
+            else "커스텀 조건이 약관 원문으로 검증되지 않아 계산하지 않았습니다.",
         )
     if rider.mapped_rule_id is None or rider.mapped_rule_id not in rules:
         return None
@@ -119,15 +130,25 @@ def _evaluate_rider(
             rule.rule_id,
             "NOT_EVALUATED",
             0,
-            f"'{rule.display_name}' 규칙이 약관 원문으로 검증되지 않아 계산하지 않았습니다.",
+            f"No schedule of benefits on file for '{rule.display_name}'; not calculated. "
+            "Add rule_config_override from the policy certificate."
+            if rule.category == "US_FIXED_BENEFIT"
+            else f"'{rule.display_name}' 규칙이 약관 원문으로 검증되지 않아 계산하지 않았습니다.",
         )
-    outcome = evaluate_rider(rule, policy, rider, claim)
+    if rule.category == "US_FIXED_BENEFIT":
+        outcome = evaluate_us_rider(rule, policy, rider, claim)
+    else:
+        outcome = evaluate_rider(rule, policy, rider, claim)
     if outcome is not None and override_used:
         outcome = Outcome(
             result=outcome.result.model_copy(
                 update={
                     "basis": outcome.result.basis
-                    + " (이 특약의 증권/약관에서 확인한 지급 요건 기준)"
+                    + (
+                        " (per this rider's schedule of benefits)"
+                        if rule.category == "US_FIXED_BENEFIT"
+                        else " (이 특약의 증권/약관에서 확인한 지급 요건 기준)"
+                    )
                 }
             ),
             rule_id=outcome.rule_id,
