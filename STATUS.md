@@ -1,6 +1,15 @@
 # 진행 현황
 
-최종 갱신: 2026-10-24
+최종 갱신: 2026-11-02
+
+## 최신 진행 상황 (2026-11-02)
+
+- **Agensi.io / Claude Code 상용 MCP 스킬 키트 패키징 및 규격 추가**:
+  - `SKILL.md`: Claude Code 및 AI 코딩 에이전트 연동용 표준 Skill 규격 정의 (FastMCP 엔드포인트 `/mcp`, 인증 헤더, 8개 도구 호출 가이드, 워크플로 프롬프트 수록).
+  - `agensi-listing.json`: Agensi.io 마켓플레이스 등록 메타데이터 (이름, 태그, 가격 가이드, 요구사항, 릴리스 버전).
+  - `.env.example`: 상용 배포 및 셀프 호스팅 구매자를 위한 환경설정 템플릿.
+  - `docs/SELLING_GUIDE.md`: Agensi.io 및 Gumroad 등록 매뉴얼, 가격 책정 전략, 배포 아키텍처 및 라이선스 정책 정리.
+  - **독립형 스타터 키트 실 동작 검증 완료**: `deterministic-mcp-starter-kit` 패키지 구축 및 pytest 80 passed, 로컬 FastMCP 서버 live 구동(`/api/health`, `/api/version`, `/llms.txt`, `/start.md`, 인증 게이트) 100% 정상 통과 검증 후 리포지토리 동기화.
 
 ## 최신 진행 상황 (2026-10-24)
 

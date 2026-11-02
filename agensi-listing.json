@@ -1,0 +1,20 @@
+{
+  "product_name": "Insurance Claim MCP & Deterministic Rules Engine",
+  "short_tagline": "Zero-hallucination medical receipt and insurance policy evaluation via FastMCP and Google Cloud Run.",
+  "category": "Developer Tools & AI Agents",
+  "pricing": {
+    "recommended_price_usd": 79.00,
+    "pricing_type": "one-time",
+    "minimum_price_usd": 49.00,
+    "extended_commercial_license_usd": 149.00
+  },
+  "tags": [
+    "mcp",
+    "fastmcp",
+    "insurance",
+    "rules-engine",
+    "claude-code",
+    "cursor",
+    "zero-hallucination"
+  ]
+}
