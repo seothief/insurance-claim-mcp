@@ -4,12 +4,15 @@
 
 ## 최신 진행 상황 (2026-11-02)
 
-- **Agensi.io / Claude Code 상용 MCP 스킬 키트 패키징 및 규격 추가**:
-  - `SKILL.md`: Claude Code 및 AI 코딩 에이전트 연동용 표준 Skill 규격 정의 (FastMCP 엔드포인트 `/mcp`, 인증 헤더, 8개 도구 호출 가이드, 워크플로 프롬프트 수록).
-  - `agensi-listing.json`: Agensi.io 마켓플레이스 등록 메타데이터 (이름, 태그, 가격 가이드, 요구사항, 릴리스 버전).
-  - `.env.example`: 상용 배포 및 셀프 호스팅 구매자를 위한 환경설정 템플릿.
-  - `docs/SELLING_GUIDE.md`: Agensi.io 및 Gumroad 등록 매뉴얼, 가격 책정 전략, 배포 아키텍처 및 라이선스 정책 정리.
-  - **독립형 스타터 키트 실 동작 검증 완료**: `deterministic-mcp-starter-kit` 패키지 구축 및 pytest 80 passed, 로컬 FastMCP 서버 live 구동(`/api/health`, `/api/version`, `/llms.txt`, `/start.md`, 인증 게이트) 100% 정상 통과 검증 후 리포지토리 동기화.
+- **마켓 등록 패키징 (무료·MIT 공개)** — 등록 절차는 [docs/PUBLISHING.md](docs/PUBLISHING.md)
+  - `LICENSE`(MIT) 추가, `pyproject.toml`에 `insurance-claim-mcp` 콘솔 스크립트·메타데이터 추가. `uvx insurance-claim-mcp`로 stdio 서버 실행 확인(도구 11개 응답).
+  - 설치형 실행 시 기본 DB를 `~/.insurance-claim-mcp/claim_service.db`로 지정(소스 체크아웃에서는 기존대로 저장소 루트).
+  - `psycopg[binary]`를 선택 의존성 `[postgres]`로 분리. 기존 고정 버전에 Python 3.14 휠이 없어 uvx 설치가 실패했음. Docker/Cloud Run은 `requirements.lock.txt`를 쓰므로 영향 없음.
+  - `server.json`: 공식 MCP Registry 메타데이터(PyPI 패키지, stdio). 2025-12-11 스키마 검증 통과.
+  - `skills/insurance-claim-mcp/SKILL.md` + `scripts/build_agensi_zip.py`: Agensi 무료 스킬 패키지. `agensi-listing.json`은 무료 등록용 설명·태그로 교체.
+  - `.env.example`: 서버가 실제로 읽는 `DATABASE_URL`, `APP_VERSION`만 남김(이전 템플릿의 `API_KEY`, `PUBLIC_BASE_URL` 등은 코드에서 사용되지 않음).
+  - 정정: 이전 기록의 `deterministic-mcp-starter-kit` 패키지와 `pytest 80 passed`, `/llms.txt`·`/start.md` 엔드포인트는 이 저장소에 존재하지 않음. 실제 테스트는 71개 통과.
+  - 미완료(본인 계정 필요): PyPI 게시, `mcp-publisher` 로그인·게시, Agensi 판매자 가입·업로드.
 
 ## 최신 진행 상황 (2026-10-24)
 

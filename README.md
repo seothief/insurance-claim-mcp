@@ -4,6 +4,25 @@
 
 > 정보 제공용 예상치입니다. 실제 지급 여부와 금액은 보험사 심사에 따라 달라집니다.
 
+<!-- MCP Registry ownership marker: do not remove -->
+mcp-name: io.github.seothief/insurance-claim-mcp
+
+## 빠른 시작 (설치형 MCP 서버)
+
+[uv](https://docs.astral.sh/uv/)가 있으면 설치 없이 바로 실행됩니다. 데이터는 내 PC의 `~/.insurance-claim-mcp/`(SQLite)에만 저장됩니다.
+
+```json
+{
+  "mcpServers": {
+    "insurance-claim": { "command": "uvx", "args": ["insurance-claim-mcp"] }
+  }
+}
+```
+
+Claude Code: `claude mcp add insurance-claim -- uvx insurance-claim-mcp`
+PostgreSQL을 쓰려면 `uvx --from "insurance-claim-mcp[postgres]" insurance-claim-mcp`와 `DATABASE_URL`을 지정합니다.
+에이전트용 사용 지침은 [skills/insurance-claim-mcp/SKILL.md](skills/insurance-claim-mcp/SKILL.md), 마켓 등록 절차는 [docs/PUBLISHING.md](docs/PUBLISHING.md)를 참고하세요.
+
 ## 핵심 설계 및 아키텍처
 
 - **LLM 추론 + 결정론적(Deterministic) 규칙 엔진 분리**
@@ -58,3 +77,6 @@ python -m venv .venv
 
 ## 진행 현황
 [STATUS.md](STATUS.md)
+
+## 라이선스
+[MIT](LICENSE)

@@ -1,20 +1,11 @@
 {
-  "product_name": "Insurance Claim MCP & Deterministic Rules Engine",
-  "short_tagline": "Zero-hallucination medical receipt and insurance policy evaluation via FastMCP and Google Cloud Run.",
-  "category": "Developer Tools & AI Agents",
+  "skill_folder": "skills/insurance-claim-mcp",
+  "zip": "dist/insurance-claim-mcp-skill.zip",
+  "title": "Insurance Claim Estimator (Korea)",
+  "listing_description": "Turn a Korean hospital receipt into an insurance payout estimate. Your agent reads policy certificates and receipts; the open-source insurance-claim-mcp server (MIT, runs locally via uvx) does the math with a fail-closed rule engine, so unverified riders return NOT_EVALUATED instead of a guess. Covers 실손 generations and common fixed-benefit riders, KCD code matching, and insurer document checklists. Estimates only, not a payout decision.",
   "pricing": {
-    "recommended_price_usd": 79.00,
-    "pricing_type": "one-time",
-    "minimum_price_usd": 49.00,
-    "extended_commercial_license_usd": 149.00
+    "type": "free"
   },
-  "tags": [
-    "mcp",
-    "fastmcp",
-    "insurance",
-    "rules-engine",
-    "claude-code",
-    "cursor",
-    "zero-hallucination"
-  ]
+  "tags": ["mcp", "insurance", "korea", "kcd", "healthcare", "claims", "claude-code"],
+  "requires": "insurance-claim-mcp MCP server (uvx insurance-claim-mcp)"
 }

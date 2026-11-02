@@ -2,18 +2,31 @@
 name = "insurance-claim-mcp"
 version = "0.1.0"
 description = "MCP service that matches medical receipts against insurance policies (informational estimates only)."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "seothief" }]
 requires-python = ">=3.12"
+keywords = ["mcp", "model-context-protocol", "insurance", "kcd", "claims"]
 dependencies = [
     "fastapi==0.143.1",
     "fastmcp==4.1.0",
     "pydantic==2.14.1",
     "pydantic-settings==2.16.0",
-    "psycopg[binary]==3.2.9",
     "sqlalchemy==2.1.4",
     "uvicorn==0.54.0",
 ]
 
+[project.urls]
+Repository = "https://github.com/seothief/insurance-claim-mcp"
+
+[project.scripts]
+insurance-claim-mcp = "claim_service.mcp.server:main"
+
 [project.optional-dependencies]
+postgres = [
+    "psycopg[binary]==3.2.9",
+]
 dev = [
     "pytest==9.1.1",
     "httpx==0.28.1",
@@ -22,7 +35,7 @@ dev = [
 ]
 
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
