@@ -2,6 +2,18 @@
 
 최종 갱신: 2026-11-02
 
+## 최신 진행 상황 (2026-11-02, 0.2.0 미국판)
+
+- **버그 수정**: MCP `register_user_policy`가 계약 단위 `source_type`/`issuer`/`issued_on`을 받지 않아, MCP로 등록한 계약은 항상 `USER_STATED`로 저장되고 어떤 특약도 계산되지 않던 문제를 수정(회귀 테스트 추가).
+- **미국 보충형 정액보험 지원** (`US_HOSPITAL_INDEMNITY`, `US_ACCIDENT`, `US_CRITICAL_ILLNESS`, 금액은 달러 정수):
+  - `domain/icd10cm.py`: ICD-10-CM 정규화, 접두어·제외 매칭, 최장 접두어 스케줄 조회.
+  - `domain/us_catalog.py`: 입원 정액, 일당(최대일수·면책일), ICU 일당, 중대질병 일시금(% 지급), 상해 골절 스케줄, 응급실. 표준 수치가 없으므로 전부 `verified=False`이고, 증권(schedule of benefits)에서 읽은 `rule_config_override`가 있을 때만 계산.
+  - `domain/us_rules.py`: 영어 근거 문구. 필수 스케줄 항목이나 진료 사실이 없으면 `NOT_EVALUATED`.
+  - 특약명 자동 매핑은 계약 종류별 규칙 범주(KR `FIXED_BENEFIT` / US `US_FIXED_BENEFIT`)로 분리. 미국 계약만 있으면 영어 면책문구·서류 목록 사용.
+  - `get_document_request_guide`: US 유형은 영어 서류 요청 안내 반환. 서버 지침에 영어 사용자·US 규칙 추가.
+  - 영어 스킬 `skills/us-supplemental-claims/SKILL.md`, zip 빌더가 스킬 폴더별 zip 생성. 버전 0.2.0.
+  - 테스트 86개 통과(US 14개 추가).
+
 ## 최신 진행 상황 (2026-11-02)
 
 - **마켓 등록 패키징 (무료·MIT 공개)** — 등록 절차는 [docs/PUBLISHING.md](docs/PUBLISHING.md)

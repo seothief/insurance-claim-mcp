@@ -23,6 +23,16 @@ Claude Code: `claude mcp add insurance-claim -- uvx insurance-claim-mcp`
 PostgreSQL을 쓰려면 `uvx --from "insurance-claim-mcp[postgres]" insurance-claim-mcp`와 `DATABASE_URL`을 지정합니다.
 에이전트용 사용 지침은 [skills/insurance-claim-mcp/SKILL.md](skills/insurance-claim-mcp/SKILL.md), 마켓 등록 절차는 [docs/PUBLISHING.md](docs/PUBLISHING.md)를 참고하세요.
 
+## English (US supplemental plans)
+
+Estimates what US **hospital indemnity, accident and critical illness** plans pay, from the plan's schedule of benefits and the ICD-10-CM codes on the hospital bill. The math runs in a deterministic, fail-closed rule engine: a benefit the schedule doesn't confirm comes back `NOT_EVALUATED`, never a guess.
+
+```bash
+claude mcp add insurance-claim -- uvx insurance-claim-mcp
+```
+
+Supported benefits: hospital admission, daily confinement (max days, elimination period), ICU days, critical illness lump sum (ICD-10-CM prefixes, % of face amount), accident fracture schedule, and ER visits. Agent instructions: [skills/us-supplemental-claims/SKILL.md](skills/us-supplemental-claims/SKILL.md). Data stays local (`~/.insurance-claim-mcp/`). Estimates only, not claim decisions.
+
 ## 핵심 설계 및 아키텍처
 
 - **LLM 추론 + 결정론적(Deterministic) 규칙 엔진 분리**

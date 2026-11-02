@@ -111,3 +111,41 @@ def test_mcp_onboarding_resource_includes_bound_user_context(client: TestClient)
     guide = asyncio.run(read_guide())
     assert guide["trigger_phrase"] == "보험비서 시작"
     assert "steps" in guide
+
+def test_mcp_certified_policy_is_calculated(client: TestClient) -> None:
+    """Policy-level source_type must reach the service, or nothing is ever calculated."""
+
+    async def flow() -> tuple[dict[str, object], dict[str, object]]:
+        async with Client(mcp) as mcp_client:
+            await mcp_client.call_tool("register_user", {"user_id": "cert_user"})
+            registered = await mcp_client.call_tool(
+                "register_user_policy",
+                {
+                    "user_id": "cert_user",
+                    "company": "테스트손보",
+                    "product_name": "테스트 종합",
+                    "policy_type": "FIXED_BENEFIT",
+                    "source_type": "POLICY_CERTIFICATE",
+                    "issuer": "테스트손보",
+                    "issued_on": "2026-01-01",
+                    "riders": [
+                        {
+                            "rider_name": "응급실내원비",
+                            "coverage_amount": 20000,
+                            "source_type": "POLICY_CERTIFICATE",
+                            "issuer": "테스트손보",
+                            "issued_on": "2026-01-01",
+                            "rule_config_override": {},
+                        }
+                    ],
+                },
+            )
+            evaluated = await mcp_client.call_tool(
+                "evaluate_claim", {"user_id": "cert_user", "claim": {"is_emergency": True}}
+            )
+            return json.loads(registered.content[0].text), json.loads(evaluated.content[0].text)
+
+    registered, evaluated = asyncio.run(flow())
+    assert registered["policy"]["source_type"] == "POLICY_CERTIFICATE"  # type: ignore[index]
+    assert evaluated["total_estimated_payout"] == 20000
+    assert evaluated["unverified_source_riders"] == []

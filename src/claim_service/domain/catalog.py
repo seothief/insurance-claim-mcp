@@ -8,7 +8,8 @@ evaluator reports them as not evaluated instead of guessing.
 import re
 from collections.abc import Iterable
 
-from claim_service.domain.models import CoverageRule
+from claim_service.domain.models import US_POLICY_TYPES, CoverageRule, RuleCategory
+from claim_service.domain.us_catalog import US_RULES
 
 UNVERIFIED_SOURCE = "미확보: 약관 원문 대조 전 (PoC 수치 또는 일반 명칭 기반 초안)"
 UNCONFIGURED_SILSON_SOURCE = "미확보: 약관 수치 미입력 (계산하지 않음, 원문 확보 후 입력)"
@@ -228,7 +229,7 @@ EXTRA_FIXED_RULES: tuple[CoverageRule, ...] = (
     ),
 )
 
-STANDARD_RULES = (*SILSON_RULES, *FIXED_RULES, *EXTRA_FIXED_RULES)
+STANDARD_RULES = (*SILSON_RULES, *FIXED_RULES, *EXTRA_FIXED_RULES, *US_RULES)
 
 
 def _bigrams(text: str) -> set[str]:
@@ -236,22 +237,35 @@ def _bigrams(text: str) -> set[str]:
     return {cleaned[i : i + 2] for i in range(len(cleaned) - 1)}
 
 
-def match_fixed_rule(rider_name: str, rules: Iterable[CoverageRule]) -> str | None:
-    """Map a raw rider name from a policy document to a standard FIXED_BENEFIT rule id."""
+def match_fixed_rule(
+    rider_name: str,
+    rules: Iterable[CoverageRule],
+    category: RuleCategory = "FIXED_BENEFIT",
+) -> str | None:
+    """Map a raw rider name from a policy document to a standard rule id of ``category``."""
     lowered = rider_name.lower()
     for rule in rules:
-        if rule.category == "FIXED_BENEFIT" and any(
+        if rule.category == category and any(
             keyword.lower() in lowered for keyword in rule.match_keywords
         ):
             return rule.rule_id
     return None
 
 
-def candidate_rule_ids(rider_name: str, rules: Iterable[CoverageRule]) -> list[str]:
-    """Fixed-benefit rules sharing a two-character word with the rider name, for AI confirmation."""
-    rider_words = _bigrams(rider_name)
+def candidate_rule_ids(
+    rider_name: str,
+    rules: Iterable[CoverageRule],
+    category: RuleCategory = "FIXED_BENEFIT",
+) -> list[str]:
+    """Rules of ``category`` sharing a two-character word with the rider name (AI confirms)."""
+    rider_words = _bigrams(rider_name.lower())
     return [
         rule.rule_id
         for rule in rules
-        if rule.category == "FIXED_BENEFIT" and _bigrams(rule.display_name) & rider_words
+        if rule.category == category and _bigrams(rule.display_name.lower()) & rider_words
     ]
+
+
+def rule_category_for(policy_type: str) -> RuleCategory:
+    """Riders on US policies map to US rules; everything else maps to Korean fixed benefits."""
+    return "US_FIXED_BENEFIT" if policy_type in US_POLICY_TYPES else "FIXED_BENEFIT"

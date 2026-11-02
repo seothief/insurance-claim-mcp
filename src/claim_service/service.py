@@ -4,7 +4,11 @@ from collections.abc import Sequence
 from typing import Any
 
 from claim_service.db.repository import PolicyRepository, RiderPlan
-from claim_service.domain.catalog import candidate_rule_ids, match_fixed_rule
+from claim_service.domain.catalog import (
+    candidate_rule_ids,
+    match_fixed_rule,
+    rule_category_for,
+)
 from claim_service.domain.errors import (
     AccessDeniedError,
     ConflictError,
@@ -23,6 +27,7 @@ from claim_service.domain.models import (
     RiderIn,
     RiderOut,
     RiderResolve,
+    RuleCategory,
     UnresolvedRider,
     UserIn,
     UserProfile,
@@ -75,7 +80,13 @@ class PolicyService:
         policies = self._repo.list_policies(user_id)
         rules = self._repo.get_rules()
         riders = [rider for policy in policies for rider in policy.riders]
-        unresolved = self._unresolved(riders, rules)
+        unresolved = [
+            item
+            for policy in policies
+            for item in self._unresolved(
+                policy.riders, rules, rule_category_for(policy.policy_type)
+            )
+        ]
         resolved_count = sum(
             1 for rider in riders if rider.mapping_status != "NEEDS_CLARIFICATION"
         )
@@ -118,11 +129,12 @@ class PolicyService:
             issuer=policy.issuer,
             issued_on=policy.issued_on,
         )
-        plan = [self._plan_rider(rider, rules) for rider in policy.riders]
+        category = rule_category_for(policy.policy_type)
+        plan = [self._plan_rider(rider, rules, category) for rider in policy.riders]
         action, stored = self._repo.save_policy(
             user_id, draft, plan, replace_riders=policy.replace_riders
         )
-        unresolved = self._unresolved(stored.riders, rules)
+        unresolved = self._unresolved(stored.riders, rules, category)
         prompt = build_follow_up_prompt(policy.company, unresolved) if unresolved else None
         if note:
             prompt = f"{prompt}\n[실손 세대] {note}" if prompt else f"[실손 세대] {note}"
@@ -164,26 +176,28 @@ class PolicyService:
     # ---- helpers --------------------------------------------------------
     @staticmethod
     def _unresolved(
-        riders: Sequence[RiderOut], rules: dict[str, CoverageRule]
+        riders: Sequence[RiderOut], rules: dict[str, CoverageRule], category: RuleCategory
     ) -> list[UnresolvedRider]:
         return [
             UnresolvedRider(
                 rider_id=rider.rider_id,
                 rider_name=rider.rider_name,
-                candidate_rules=candidate_rule_ids(rider.rider_name, rules.values()),
+                candidate_rules=candidate_rule_ids(rider.rider_name, rules.values(), category),
             )
             for rider in riders
             if rider.mapping_status == "NEEDS_CLARIFICATION"
         ]
 
     @staticmethod
-    def _plan_rider(rider: RiderIn, rules: dict[str, CoverageRule]) -> RiderPlan:
+    def _plan_rider(
+        rider: RiderIn, rules: dict[str, CoverageRule], category: RuleCategory
+    ) -> RiderPlan:
         """Automatic matching never overrides a mapping the user or AI already confirmed.
 
         Keyword matches are written as non-explicit so an existing confirmed mapping is kept on
         re-registration. Riders with no keyword match are flagged for AI clarification.
         """
-        matched = match_fixed_rule(rider.rider_name, rules.values())
+        matched = match_fixed_rule(rider.rider_name, rules.values(), category)
         return RiderPlan(
             rider_name=rider.rider_name,
             coverage_amount=rider.coverage_amount,
@@ -204,7 +218,7 @@ class PolicyService:
             rule = rules.get(body.mapped_rule_id or "")
             if rule is None:
                 raise InvalidMappingError("mapped_rule_id는 존재하는 표준 규칙 ID여야 합니다.")
-            if rule.category != "FIXED_BENEFIT":
+            if rule.category not in ("FIXED_BENEFIT", "US_FIXED_BENEFIT"):
                 raise InvalidMappingError("실손 규칙은 특약에 연결할 수 없습니다.")
             values.update(mapped_rule_id=rule.rule_id, custom_rule_config=None)
         elif body.mapping_status == "CUSTOM":

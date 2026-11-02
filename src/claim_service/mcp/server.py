@@ -4,15 +4,17 @@ from collections.abc import Callable
 
 from fastmcp import FastMCP
 
-from claim_service.domain.document_guide import PolicyKind, request_guide
+from claim_service.domain.document_guide import PolicyKind, request_guide, request_guide_us
 from claim_service.domain.errors import DomainError
 from claim_service.domain.models import (
+    US_POLICY_TYPES,
     ClaimInput,
     PolicyIn,
     PolicyType,
     ResolvableStatus,
     RiderIn,
     RiderResolve,
+    SourceType,
     UserIn,
 )
 from claim_service.domain.security import get_bound_user
@@ -51,7 +53,18 @@ ASSISTANT_INSTRUCTIONS = (
     "[주의사항]\n"
     "- 모든 약관 수치는 verified=false 상태이므로 '예상 금액'으로만 안내하고, "
     "'지급 확정'이나 '반드시 청구하세요' 같은 단정·권유 표현을 쓰지 않는다.\n"
-    "- 주민등록번호, 실제 증권번호, 계좌번호는 요구하거나 저장하지 않는다."
+    "- 주민등록번호, 실제 증권번호, 계좌번호는 요구하거나 저장하지 않는다.\n"
+    "[US supplemental plans / English users]\n"
+    "If the user writes in English or has a US plan, reply in English and follow these rules. "
+    "US hospital indemnity, accident and critical illness plans use policy_type "
+    "US_HOSPITAL_INDEMNITY, US_ACCIDENT or US_CRITICAL_ILLNESS and amounts in whole US dollars. "
+    "US benefits are calculated only from the policy's schedule of benefits: register the policy "
+    "and each rider with source_type=POLICY_CERTIFICATE and put the schedule terms in "
+    "rule_config_override (see schedule_fields in list_standard_rules, e.g. "
+    '{"max_days": 30} or {"schedule": {"S72": 4000}}). For claims, send icd10_code (ICD-10-CM), '
+    "is_inpatient, inpatient_days, icu_days, is_injury and is_emergency as read from the "
+    "itemized bill or discharge summary. Never ask for SSNs, member IDs or bank details. "
+    "Results are estimates, not claim decisions."
 )
 
 mcp = FastMCP("Personal-Insurance-Claim-Agent", instructions=ASSISTANT_INSTRUCTIONS)
@@ -83,6 +96,8 @@ def document_request_guide_resource(
     policy_type: str, product_name: str
 ) -> dict[str, object]:
     """보험사 공식 경로로 증권·약관 서류를 요청하는 안내를 제공하는 동적 템플릿 리소스입니다."""
+    if policy_type.upper() in US_POLICY_TYPES:
+        return request_guide_us(product_name)
     kind: PolicyKind = _to_guide_kind(policy_type.upper())
     return request_guide(kind, product_name)
 
@@ -100,7 +115,12 @@ def _guard[T](call: Callable[[], T]) -> T:
 def get_document_request_guide(
     policy_type: PolicyType, product_name: str
 ) -> dict[str, object]:
-    """보험사에 요청해야 할 증권과 약관 목록, 요청 문구, 공식 요청 경로를 돌려줍니다."""
+    """보험사에 요청해야 할 증권과 약관 목록, 요청 문구, 공식 요청 경로를 돌려줍니다.
+
+    For US_* policy types, returns an English checklist for the schedule of benefits.
+    """
+    if policy_type in US_POLICY_TYPES:
+        return request_guide_us(product_name)
     kind: PolicyKind = "OTHER" if policy_type == "OTHER" else _to_guide_kind(policy_type)
     return request_guide(kind, product_name)
 
@@ -166,9 +186,19 @@ def register_user_policy(
     silson_generation: int | None = None,
     enrolled_year: int | None = None,
     replace_riders: bool = False,
+    source_type: SourceType = "USER_STATED",
+    issuer: str | None = None,
+    issued_on: str | None = None,
     pin: str | None = None,
 ) -> dict[str, object]:
-    """보험을 등록하거나 갱신합니다. 미매핑 특약은 resolve_user_rider로 확정하세요."""
+    """보험을 등록하거나 갱신합니다. 미매핑 특약은 resolve_user_rider로 확정하세요.
+
+    Register or update a policy. US plans: policy_type US_HOSPITAL_INDEMNITY / US_ACCIDENT /
+    US_CRITICAL_ILLNESS, amounts in dollars, schedule terms in each rider's rule_config_override.
+
+    source_type: 보험증권에서 읽은 계약이면 POLICY_CERTIFICATE와 issuer, issued_on(YYYY-MM-DD)을
+    함께 보냅니다. 계약과 특약 모두 POLICY_CERTIFICATE일 때만 계산됩니다.
+    """
     policy = PolicyIn(
         company=company,
         product_name=product_name,
@@ -177,6 +207,9 @@ def register_user_policy(
         enrolled_year=enrolled_year,
         riders=riders,
         replace_riders=replace_riders,
+        source_type=source_type,
+        issuer=issuer,
+        issued_on=issued_on,
     )
     return _guard(lambda: get_service().register_policy(user_id, policy, pin=pin).model_dump())
 
@@ -235,7 +268,11 @@ def update_user_rider(
 def evaluate_claim(
     user_id: str, claim: ClaimInput, pin: str | None = None
 ) -> dict[str, object]:
-    """영수증/처방전 정보로 예상 보험금을 계산합니다. 입력된 진료 정보는 저장되지 않습니다."""
+    """영수증/처방전 정보로 예상 보험금을 계산합니다. 입력된 진료 정보는 저장되지 않습니다.
+
+    Estimate benefits from a bill. US plans: send icd10_code, is_inpatient, inpatient_days,
+    icu_days, is_injury, is_emergency. Claim data is never stored.
+    """
     return _guard(lambda: get_service().evaluate(user_id, claim, pin=pin).model_dump())
 
 

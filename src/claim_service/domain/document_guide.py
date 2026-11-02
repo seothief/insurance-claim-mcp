@@ -61,3 +61,35 @@ def request_guide(kind: PolicyKind, product_name: str) -> dict[str, object]:
             "사용자가 말로만 한 내용",
         ],
     }
+
+
+US_REQUESTS: tuple[str, ...] = (
+    "A. Policy certificate / schedule of benefits showing each benefit's amount, "
+    "day limits and elimination periods",
+    "B. Outline of coverage and any riders, exclusions or pre-existing condition limits",
+    "C. The insurer's claim form for this plan",
+)
+
+US_REQUEST_MESSAGE = (
+    "Please send the certificate of coverage and full schedule of benefits for my plan "
+    "({product}), including any riders, exclusions and pre-existing condition limitations."
+)
+
+
+def request_guide_us(product_name: str) -> dict[str, object]:
+    """Document checklist for US supplemental plans (hospital indemnity, accident, CI)."""
+    return {
+        "product_name": product_name,
+        "kind": "US_SUPPLEMENTAL",
+        "documents_to_request": list(US_REQUESTS),
+        "request_message": US_REQUEST_MESSAGE.format(product=product_name),
+        "where_to_request": [
+            "The insurer's member portal or app",
+            "Your employer's benefits portal or HR (for workplace plans)",
+            "The insurer's customer service phone line",
+        ],
+        "not_accepted": [
+            "Marketing brochures or enrollment summaries without benefit amounts",
+            "Third-party summaries or what you remember about the plan",
+        ],
+    }
